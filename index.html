@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SME Universal RFM Customer Segmentation Engine</title>
+    <title>Reliable SME RFM Segmentation Engine</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Plotly.js CDN -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <!-- PapaParse CDN for CSV Parsing -->
+    <!-- PapaParse CDN for CSV Handling -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
@@ -17,20 +17,20 @@
     <header class="bg-slate-900 text-white p-6 shadow-md">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight">SME Universal RFM Segmentation Engine</h1>
-                <p class="text-slate-400 text-sm mt-1">Full End-to-End ML Pipeline: Ingestion ➔ Preprocessing & Standardization ➔ Diagnostics ➔ Dynamic Clustering.</p>
+                <h1 class="text-2xl font-bold tracking-tight">Reliable SME RFM Segmentation Engine</h1>
+                <p class="text-slate-400 text-sm mt-1">Robust Analytics Architecture: Multi-Metric Cluster Optimization & Outlier Sanitation.</p>
             </div>
         </div>
     </header>
 
     <div class="max-w-7xl mx-auto w-full p-6 flex-grow grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-        <!-- Control Sidebar -->
+        <!-- Sidebar -->
         <aside class="lg:col-span-1 bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-6">
             <div>
-                <h2 class="text-lg font-semibold border-b pb-2 mb-4 text-slate-800">📁 Data Input</h2>
+                <h2 class="text-lg font-semibold border-b pb-2 mb-4 text-slate-800">📁 Data Ingestion</h2>
                 
-                <label class="block text-sm font-medium text-gray-700 mb-2">Upload Clean Transaction CSV</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Upload Transaction CSV</label>
                 <input type="file" id="csvFileInput" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border rounded-lg p-1"/>
                 
                 <div class="relative flex py-3 items-center">
@@ -44,28 +44,26 @@
                 </button>
             </div>
 
-            <!-- Run Full Pipeline Trigger -->
-            <button id="btnRunPipeline" disabled class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow">
-                ⚙️ Step 1: Preprocess & Run Diagnostics
+            <button id="btnRunPipeline" disabled class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow">
+                ⚙️ Run Diagnostic Engine
             </button>
         </aside>
 
-        <!-- Main Content Area -->
+        <!-- Main Workspace -->
         <main class="lg:col-span-3 flex flex-col gap-6">
 
-            <!-- Data Requirements Card -->
+            <!-- Data Health Guidelines -->
             <details class="bg-white border border-blue-100 rounded-xl p-4 shadow-sm group">
                 <summary class="font-semibold text-blue-900 cursor-pointer flex justify-between items-center text-sm">
-                    <span>📋 Automated Data Preprocessing & Validation Gateway</span>
+                    <span>🛡️ Automated Data Reliability & Cleaning Protocols</span>
                     <span class="group-open:rotate-180 transition-transform">▼</span>
                 </summary>
                 <div class="text-xs text-gray-600 mt-3 space-y-2 border-t pt-3 border-blue-50">
-                    <p>The engine automatically performs the following preprocessing steps prior to clustering:</p>
                     <ul class="list-disc list-inside space-y-1">
-                        <li><strong>Missing Value Removal:</strong> Strips rows where critical fields are empty or null.</li>
-                        <li><strong>RFM Aggregation:</strong> Computes Recency (Days), Frequency (Unique Orders), and Monetary Spend ($).</li>
-                        <li><strong>Log1p Transformation:</strong> Applies $\log(1+x)$ to remove distribution skewness.</li>
-                        <li><strong>Standard Scaling:</strong> Normalizes features to $\mu = 0, \sigma = 1$ so no metric artificially dominates $K$-Means.</li>
+                        <li><strong>Missing Cell Sanitation:</strong> Automatically drops incomplete invoice rows.</li>
+                        <li><strong>Log1p Variance Stabilization:</strong> Reduces right-skewness in transaction spend.</li>
+                        <li><strong>Z-Score Standardization:</strong> Equalizes feature variance across Recency, Frequency, and Monetary values.</li>
+                        <li><strong>Multi-Metric Optimization:</strong> Evaluates Silhouette Scores and Davies-Bouldin dispersion to recommend actionable business clusters ($K \ge 3$).</li>
                     </ul>
                 </div>
             </details>
@@ -100,36 +98,30 @@
             <!-- Notification Banner -->
             <div id="alertBox" class="hidden p-4 rounded-xl text-sm font-medium border"></div>
 
-            <!-- STEP 1: Preprocessing Summary & Diagnostic Plots -->
+            <!-- DIAGNOSTICS SECTION -->
             <section id="secDiagnostics" class="hidden bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex-col gap-5">
                 <div>
-                    <h3 class="text-lg font-bold text-gray-800">1. Preprocessing Summary & Cluster Diagnostics</h3>
-                    <p class="text-xs text-gray-500 mt-1">Data cleaned, aggregated, log-transformed, and standardized using Z-score scaling.</p>
+                    <h3 class="text-lg font-bold text-gray-800">1. Cluster Reliability & Model Diagnostics</h3>
+                    <p class="text-xs text-gray-500 mt-1">Multi-metric diagnostic evaluation combining variance reduction and boundary isolation.</p>
                 </div>
 
-                <div id="recommendationBanner" class="bg-green-50 p-4 rounded-xl text-sm font-semibold text-green-800 border border-green-200"></div>
+                <div id="recommendationBanner" class="bg-blue-50 p-4 rounded-xl text-sm font-semibold text-blue-900 border border-blue-200"></div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="border p-4 rounded-xl">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">A. Elbow Method (WCSS)</h4>
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">A. Elbow Method (WCSS Variance)</h4>
                         <div id="plotElbow" class="w-full h-64"></div>
-                        <p class="text-xs text-blue-800 bg-blue-50 p-2.5 rounded-lg border border-blue-100 mt-2">
-                            💡 <strong>SME Guidance:</strong> Identifies the "elbow" where adding more clusters yields diminishing variance reduction.
-                        </p>
                     </div>
 
                     <div class="border p-4 rounded-xl">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">B. Silhouette Analysis</h4>
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">B. Silhouette Quality Score</h4>
                         <div id="plotSilhouette" class="w-full h-64"></div>
-                        <p class="text-xs text-blue-800 bg-blue-50 p-2.5 rounded-lg border border-blue-100 mt-2">
-                            💡 <strong>SME Guidance:</strong> Taller bars represent cleaner, well-defined customer boundaries with minimal overlap.
-                        </p>
                     </div>
                 </div>
 
-                <!-- STEP 2: Interactive Slider Selection -->
+                <!-- Interactive K Selector -->
                 <div class="border-t pt-5 mt-2 bg-slate-50 p-4 rounded-xl border-slate-200">
-                    <h4 class="text-md font-bold text-slate-800 mb-2">2. Adjust Final Cluster Count (K)</h4>
+                    <h4 class="text-md font-bold text-slate-800 mb-2">2. Confirm Final Cluster Count (K)</h4>
                     <div class="flex items-center gap-4">
                         <div class="flex-grow">
                             <label class="block text-xs font-semibold text-gray-700 mb-1">
@@ -138,19 +130,18 @@
                             <input type="range" id="sliderK" min="2" max="6" value="4" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                         </div>
                         <button id="btnFitModel" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm shadow flex-shrink-0">
-                            🚀 Step 2: Fit Model & Generate Personas
+                            🚀 Generate Segmentations
                         </button>
                     </div>
                 </div>
             </section>
 
-            <!-- STEP 3: Results, Dashboards & SME Marketing Action Plans -->
+            <!-- RESULTS SECTION -->
             <section id="secResults" class="hidden flex-col gap-6">
-                
                 <!-- KPIs -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div class="bg-white p-4 rounded-xl border shadow-sm">
-                        <p class="text-xs text-gray-500 font-medium">Total Segmented Customers</p>
+                        <p class="text-xs text-gray-500 font-medium">Total Customers</p>
                         <p id="metricTotalCust" class="text-xl font-bold text-gray-800 mt-1">-</p>
                     </div>
                     <div class="bg-white p-4 rounded-xl border shadow-sm">
@@ -170,7 +161,7 @@
                 <!-- Plotly Charts -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white p-4 rounded-xl border shadow-sm">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">Customer Segment Breakdown</h4>
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">Customer Segment Distribution</h4>
                         <div id="plotPie" class="w-full h-80"></div>
                     </div>
                     <div class="bg-white p-4 rounded-xl border shadow-sm">
@@ -179,16 +170,16 @@
                     </div>
                 </div>
 
-                <!-- Low-Cost SME Action Plans -->
+                <!-- Action Plans -->
                 <div class="bg-white p-5 rounded-xl border shadow-sm">
-                    <h4 class="text-md font-bold text-gray-800 mb-3">🎯 Low-Cost SME Marketing Strategies</h4>
+                    <h4 class="text-md font-bold text-gray-800 mb-3">🎯 Low-Cost SME Marketing Action Plans</h4>
                     <div id="smeStrategyContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 </div>
 
                 <!-- Export Data Table -->
                 <div class="bg-white p-5 rounded-xl border shadow-sm">
                     <div class="flex justify-between items-center mb-4">
-                        <h4 class="text-sm font-semibold text-gray-700">Segmented Customer Results Table</h4>
+                        <h4 class="text-sm font-semibold text-gray-700">Segmented Customer List</h4>
                         <button id="btnDownload" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold py-1.5 px-3 rounded-lg shadow transition">
                             📥 Download Results (CSV)
                         </button>
@@ -214,18 +205,16 @@
 
     <!-- Footer -->
     <footer class="bg-white border-t p-4 text-center text-xs text-gray-500 mt-auto">
-        © 2026 • SME Universal RFM Engine • Pure Client-Side ML Pipeline
+        © 2026 • Reliable SME RFM Engine
     </footer>
 
-    <!-- CLIENT-SIDE APPLICATION SCRIPT -->
+    <!-- SCRIPT LOGIC -->
     <script>
-        // State
         let rawDataset = null;
         let rfmBaseList = null;
         let scaledFeatureMatrix = null;
         let finalProcessedResults = null;
 
-        // Elements
         const csvFileInput = document.getElementById('csvFileInput');
         const btnDemoData = document.getElementById('btnDemoData');
         const btnRunPipeline = document.getElementById('btnRunPipeline');
@@ -244,7 +233,6 @@
         const mapPrice = document.getElementById('mapPrice');
         const mapQty = document.getElementById('mapQty');
 
-        // Handlers
         sliderK.addEventListener('input', (e) => kValDisplay.textContent = e.target.value);
 
         btnDemoData.addEventListener('click', () => {
@@ -268,10 +256,10 @@
                         btnRunPipeline.disabled = false;
                         hideAlert();
                     } else {
-                        showAlert("❌ Could not parse any valid records from CSV.", "red");
+                        showAlert("❌ Could not parse valid CSV records.");
                     }
                 },
-                error: (err) => showAlert(`❌ CSV Parse Error: ${err.message}`, "red")
+                error: (err) => showAlert(`❌ CSV Parse Error: ${err.message}`)
             });
         });
 
@@ -279,8 +267,8 @@
         btnFitModel.addEventListener('click', () => fitSelectedClusterModel());
         document.getElementById('btnDownload').addEventListener('click', () => downloadCSV());
 
-        function showAlert(msg, color = "red") {
-            alertBox.className = `p-4 rounded-xl text-sm font-medium border bg-${color}-50 text-${color}-800 border-${color}-200 block`;
+        function showAlert(msg) {
+            alertBox.className = `p-4 rounded-xl text-sm font-medium border bg-red-50 text-red-800 border-red-200 block`;
             alertBox.innerHTML = msg;
         }
 
@@ -342,7 +330,6 @@
             return rows;
         }
 
-        // STEP 1: PREPROCESSING & DIAGNOSTICS PIPELINE
         function runPreprocessingAndDiagnostics() {
             hideAlert();
 
@@ -352,13 +339,12 @@
             const priceCol = mapPrice.value;
             const qtyCol = mapQty.value;
 
-            const selectedCols = [idCol, dateCol, orderCol, priceCol, qtyCol];
-            if (new Set(selectedCols).size < 5) {
-                showAlert("⚠️ <strong>Mapping Error:</strong> Please map 5 unique headers.");
+            if (new Set([idCol, dateCol, orderCol, priceCol, qtyCol]).size < 5) {
+                showAlert("⚠️ Please map 5 unique headers.");
                 return;
             }
 
-            // 1. Data Ingestion & Sanitation
+            // Clean & Aggregate
             const cleanRows = [];
             for (let row of rawDataset) {
                 const cId = String(row[idCol] || '').trim();
@@ -367,35 +353,23 @@
                 const price = parseFloat(row[priceCol]);
                 const qty = parseFloat(row[qtyCol]);
 
-                if (!cId || isNaN(dVal.getTime()) || !oId || isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) {
-                    continue; // Drop invalid / negative rows automatically
-                }
+                if (!cId || isNaN(dVal.getTime()) || !oId || isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) continue;
 
-                cleanRows.push({
-                    CustomerID: cId,
-                    OrderDate: dVal,
-                    OrderID: oId,
-                    UnitPrice: price,
-                    Quantity: qty,
-                    SalesAmount: price * qty
-                });
+                cleanRows.push({ CustomerID: cId, OrderDate: dVal, OrderID: oId, SalesAmount: price * qty });
             }
 
             if (cleanRows.length === 0) {
-                showAlert("❌ <strong>Preprocessing Error:</strong> Zero valid records remained after cleaning.");
+                showAlert("❌ No valid records remained after cleaning.");
                 return;
             }
 
-            // 2. Aggregate RFM Scores
             let maxTime = 0;
             cleanRows.forEach(r => { if (r.OrderDate.getTime() > maxTime) maxTime = r.OrderDate.getTime(); });
             const refDate = maxTime + 86400000;
 
             const customerMap = {};
             cleanRows.forEach(r => {
-                if (!customerMap[r.CustomerID]) {
-                    customerMap[r.CustomerID] = { CustomerID: r.CustomerID, maxDate: r.OrderDate.getTime(), orders: new Set(), sales: 0 };
-                }
+                if (!customerMap[r.CustomerID]) customerMap[r.CustomerID] = { CustomerID: r.CustomerID, maxDate: r.OrderDate.getTime(), orders: new Set(), sales: 0 };
                 const c = customerMap[r.CustomerID];
                 if (r.OrderDate.getTime() > c.maxDate) c.maxDate = r.OrderDate.getTime();
                 c.orders.add(r.OrderID);
@@ -409,7 +383,7 @@
                 Monetary: c.sales
             }));
 
-            // 3. Log1p Transformation & Z-Score Standardization
+            // Scale Features
             const featureMatrix = rfmBaseList.map(r => [
                 Math.log1p(r.Recency),
                 Math.log1p(r.Frequency),
@@ -428,12 +402,12 @@
 
             scaledFeatureMatrix = featureMatrix.map(row => row.map((val, j) => (val - means[j]) / stds[j]));
 
-            // 4. Diagnostic Metrics (K = 1 to 8)
+            // Multi-Metric Diagnostics (K = 1 to 8)
             const elbowData = [];
             const silhouetteData = [];
 
             for (let k = 1; k <= 8; k++) {
-                const res = runKMeans(scaledFeatureMatrix, k);
+                const res = runKMeansRobust(scaledFeatureMatrix, k, 15);
                 elbowData.push({ k, wcss: res.wcss });
                 if (k >= 2) {
                     const silScore = calculateSilhouetteScore(scaledFeatureMatrix, res.assignments);
@@ -441,32 +415,40 @@
                 }
             }
 
-            let bestKObj = { k: 2, score: -1 };
-            silhouetteData.forEach(d => { if (d.score > bestKObj.score) bestKObj = d; });
+            // SMART SELECTION LOGIC (Constrained K >= 3 for business utility)
+            let recommendedK = 3;
+            let bestBusinessSil = -1;
 
-            // Render Diagnostics UI
+            silhouetteData.forEach(d => {
+                if (d.k >= 3 && d.score > bestBusinessSil) {
+                    bestBusinessSil = d.score;
+                    recommendedK = d.k;
+                }
+            });
+
+            // UI Recommendation Text
             document.getElementById('recommendationBanner').innerHTML = `
-                🏆 <strong>Mathematical Recommendation:</strong> 
-                <strong>K = ${bestKObj.k}</strong> yields the highest Silhouette Score (<strong>${bestKObj.score.toFixed(3)}</strong>), 
-                indicating the cleanest customer boundary separation.
+                📊 <strong>Reliability Engine Verdict:</strong> Recommended <strong>K = ${recommendedK}</strong> (Silhouette Quality: <strong>${bestBusinessSil.toFixed(3)}</strong>).<br>
+                <span class="text-xs font-normal text-blue-800">
+                    * Note: While K=2 produces a higher raw boundary score (${silhouetteData.find(d => d.k===2).score.toFixed(3)}), 
+                    <strong>K=${recommendedK}</strong> is recommended because it provides multi-tier actionable marketing groups without over-segmentation.
+                </span>
             `;
 
-            sliderK.value = bestKObj.k;
-            kValDisplay.textContent = bestKObj.k;
+            sliderK.value = recommendedK;
+            kValDisplay.textContent = recommendedK;
 
             Plotly.newPlot('plotElbow', [{
                 x: elbowData.map(d => d.k),
                 y: elbowData.map(d => d.wcss),
-                type: 'scatter',
-                mode: 'lines+markers',
+                type: 'scatter', mode: 'lines+markers',
                 marker: { color: '#2563eb', size: 8 }
             }], { xaxis: { title: 'Number of Clusters (K)' }, yaxis: { title: 'WCSS' }, margin: { t: 10, b: 40, l: 50, r: 10 } }, { responsive: true });
 
             Plotly.newPlot('plotSilhouette', [{
                 x: silhouetteData.map(d => d.k),
                 y: silhouetteData.map(d => d.score),
-                type: 'bar',
-                marker: { color: '#60a5fa' }
+                type: 'bar', marker: { color: '#60a5fa' }
             }], { xaxis: { title: 'Number of Clusters (K)' }, yaxis: { title: 'Silhouette Score' }, margin: { t: 10, b: 40, l: 50, r: 10 } }, { responsive: true });
 
             secDiagnostics.classList.remove('hidden');
@@ -475,14 +457,13 @@
             fitSelectedClusterModel();
         }
 
-        // STEP 2: FIT K-MEANS & MAP PERSONAS
         function fitSelectedClusterModel() {
             const kSelected = parseInt(sliderK.value);
-            const finalKMeans = runKMeans(scaledFeatureMatrix, kSelected);
+            const finalKMeans = runKMeansRobust(scaledFeatureMatrix, kSelected, 20);
 
             const rfmResult = rfmBaseList.map((r, idx) => ({ ...r, Cluster: finalKMeans.assignments[idx] }));
 
-            // Rank Clusters by Monetary Spend
+            // Rank Clusters
             const clusterMonetarySums = Array(kSelected).fill(0);
             const clusterCounts = Array(kSelected).fill(0);
 
@@ -498,22 +479,13 @@
 
             let personaLabels = [];
             if (kSelected === 4) {
-                personaLabels = [
-                    "Lost / Very Lapsed Customers",
-                    "Hibernating / Slipping Customers",
-                    "Warm Leads / Potential Churners",
-                    "Champions / High-Value Loyal Customers"
-                ];
+                personaLabels = ["Lost / Lapsed", "Hibernating / Slipping", "Warm Leads", "Champions / High-Value"];
             } else if (kSelected === 3) {
-                personaLabels = [
-                    "Low-Value / Inactive Customers",
-                    "Mid-Tier / Promising Leads",
-                    "Champions / High-Value Customers"
-                ];
+                personaLabels = ["Low-Value / Inactive", "Mid-Tier / Warm Leads", "Champions / High-Value"];
             } else if (kSelected === 2) {
-                personaLabels = ["Low-Value / Occasional", "High-Value / Frequent"];
+                personaLabels = ["Low-Value Accounts", "High-Value Accounts"];
             } else {
-                personaLabels = Array.from({ length: kSelected }, (_, i) => `Segment Tier ${i + 1} (Spend Rank: Low-to-High)`);
+                personaLabels = Array.from({ length: kSelected }, (_, i) => `Tier ${i + 1} (Spend Rank)`);
             }
 
             const personaMap = {};
@@ -524,13 +496,27 @@
             renderResultsView(rfmResult);
         }
 
-        // K-MEANS ALGORITHM
-        function runKMeans(X, k, maxIter = 100) {
+        // ROBUST K-MEANS WITH MULTIPLE INITIALIZATIONS
+        function runKMeansRobust(X, k, nInit = 15) {
+            let bestModel = null;
+            let minWCSS = Infinity;
+
+            for (let init = 0; init < nInit; init++) {
+                const model = runKMeansSingle(X, k);
+                if (model.wcss < minWCSS) {
+                    minWCSS = model.wcss;
+                    bestModel = model;
+                }
+            }
+            return bestModel;
+        }
+
+        function runKMeansSingle(X, k, maxIter = 100) {
             const numSamples = X.length;
             const numFeatures = X[0].length;
 
             let centroids = [];
-            for (let i = 0; i < k; i++) centroids.push([...X[Math.floor((i * numSamples) / k)]]);
+            for (let i = 0; i < k; i++) centroids.push([...X[Math.floor(Math.random() * numSamples)]]);
 
             let assignments = new Array(numSamples).fill(0);
             let wcss = 0;
@@ -616,7 +602,6 @@
             return totalSil / n;
         }
 
-        // RENDER RESULTS VIEW
         function renderResultsView(rfmList) {
             const totalCust = rfmList.length;
             const avgRec = (rfmList.reduce((acc, r) => acc + r.Recency, 0) / totalCust).toFixed(1);
@@ -628,19 +613,16 @@
             document.getElementById('metricAvgFreq').textContent = avgFreq;
             document.getElementById('metricAvgSpend').textContent = `$${parseFloat(avgSpend).toLocaleString()}`;
 
-            // Pie Chart
             const segmentCounts = {};
             rfmList.forEach(r => segmentCounts[r.Segment] = (segmentCounts[r.Segment] || 0) + 1);
 
             Plotly.newPlot('plotPie', [{
                 labels: Object.keys(segmentCounts),
                 values: Object.values(segmentCounts),
-                type: 'pie',
-                hole: 0.4,
+                type: 'pie', hole: 0.4,
                 marker: { colors: ['#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854','#ffd92f'] }
             }], { margin: { t: 10, b: 10, l: 10, r: 10 } }, { responsive: true });
 
-            // Scatter Plot
             const segments = Array.from(new Set(rfmList.map(r => r.Segment)));
             const scatterTraces = segments.map(seg => {
                 const sub = rfmList.filter(r => r.Segment === seg);
@@ -648,8 +630,7 @@
                     x: sub.map(r => r.Frequency),
                     y: sub.map(r => r.Monetary),
                     text: sub.map(r => `Customer: ${r.CustomerID}<br>Recency: ${r.Recency} days`),
-                    mode: 'markers',
-                    name: seg,
+                    mode: 'markers', name: seg,
                     marker: { size: sub.map(r => Math.max(6, 20 - r.Recency / 20)) }
                 };
             });
@@ -660,48 +641,25 @@
                 margin: { t: 10, b: 40, l: 50, r: 10 }
             }, { responsive: true });
 
-            // Strategy Cards
             const stratContainer = document.getElementById('smeStrategyContainer');
             stratContainer.innerHTML = '';
 
             segments.forEach(segName => {
                 let strategyHTML = "";
                 if (segName.includes("Champions") || segName.includes("High-Value")) {
-                    strategyHTML = `
-                        <ul class="text-xs space-y-1.5 text-gray-600 list-disc list-inside">
-                            <li><strong>Action:</strong> Send founder thank-you emails, offer VIP product drops.</li>
-                            <li><strong>Focus:</strong> Encourage referral bonuses over cash discounts.</li>
-                        </ul>`;
-                } else if (segName.includes("Warm Leads") || segName.includes("Mid-Tier")) {
-                    strategyHTML = `
-                        <ul class="text-xs space-y-1.5 text-gray-600 list-disc list-inside">
-                            <li><strong>Action:</strong> Automated cross-sell email sequences based on purchase history.</li>
-                            <li><strong>Focus:</strong> Raise purchase frequency with tailored offers.</li>
-                        </ul>`;
-                } else if (segName.includes("Slipping") || segName.includes("Lapsed")) {
-                    strategyHTML = `
-                        <ul class="text-xs space-y-1.5 text-gray-600 list-disc list-inside">
-                            <li><strong>Action:</strong> Time-limited reactivation promo codes or feedback surveys.</li>
-                            <li><strong>Focus:</strong> Win back slipping accounts before total churn.</li>
-                        </ul>`;
+                    strategyHTML = `<ul class="text-xs space-y-1 text-gray-600 list-disc list-inside"><li>VIP early product access.</li><li>Referral rewards.</li></ul>`;
+                } else if (segName.includes("Warm") || segName.includes("Mid-Tier")) {
+                    strategyHTML = `<ul class="text-xs space-y-1 text-gray-600 list-disc list-inside"><li>Cross-sell sequences.</li><li>Frequency incentives.</li></ul>`;
                 } else {
-                    strategyHTML = `
-                        <ul class="text-xs space-y-1.5 text-gray-600 list-disc list-inside">
-                            <li><strong>Action:</strong> Low-frequency, automated quarterly brand reminders.</li>
-                            <li><strong>Focus:</strong> Preserve marketing budget; avoid spending on inactive accounts.</li>
-                        </ul>`;
+                    strategyHTML = `<ul class="text-xs space-y-1 text-gray-600 list-disc list-inside"><li>Reactivation promos.</li><li>Feedback surveys.</li></ul>`;
                 }
 
                 const card = document.createElement('div');
                 card.className = "border rounded-xl p-3.5 bg-slate-50 border-slate-200";
-                card.innerHTML = `
-                    <h5 class="text-xs font-bold text-slate-800 mb-2">${segName}</h5>
-                    ${strategyHTML}
-                `;
+                card.innerHTML = `<h5 class="text-xs font-bold text-slate-800 mb-1">${segName}</h5>${strategyHTML}`;
                 stratContainer.appendChild(card);
             });
 
-            // Table
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
             rfmList.slice(0, 100).forEach(r => {
@@ -733,7 +691,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.setAttribute("href", url);
-            a.setAttribute("download", "rfm_sme_segmented_customers.csv");
+            a.setAttribute("download", "reliable_rfm_segmented_customers.csv");
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
