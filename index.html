@@ -68,6 +68,57 @@
                 </div>
             </details>
 
+            <!-- NEW SECTION: HOW RFM CALCULATIONS ARE DONE -->
+            <details class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm group" open>
+                <summary class="font-semibold text-slate-800 cursor-pointer flex justify-between items-center text-sm">
+                    <span>🧮 How RFM Metrics & Feature Scaling Are Calculated</span>
+                    <span class="group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div class="text-xs text-gray-600 mt-3 border-t pt-3 border-slate-100 space-y-4">
+                    <p class="leading-relaxed">
+                        To cluster customers accurately, raw transaction rows are aggregated per unique customer ID and transformed using the following mathematical pipeline:
+                    </p>
+
+                    <!-- Cards Layout -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg">
+                            <h5 class="font-bold text-slate-800 text-xs mb-1">1. Recency (R)</h5>
+                            <p class="text-slate-500 mb-2">Days since last purchase relative to max date in file.</p>
+                            <code class="block bg-white p-2 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">
+                                R = (MaxDate + 1) - LastOrderDate
+                            </code>
+                        </div>
+
+                        <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg">
+                            <h5 class="font-bold text-slate-800 text-xs mb-1">2. Frequency (F)</h5>
+                            <p class="text-slate-500 mb-2">Total count of distinct invoice numbers per customer.</p>
+                            <code class="block bg-white p-2 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">
+                                F = CountDistinct(OrderID)
+                            </code>
+                        </div>
+
+                        <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg">
+                            <h5 class="font-bold text-slate-800 text-xs mb-1">3. Monetary (M)</h5>
+                            <p class="text-slate-500 mb-2">Cumulative revenue generated across all transactions.</p>
+                            <code class="block bg-white p-2 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">
+                                M = Sum(UnitPrice × Quantity)
+                            </code>
+                        </div>
+                    </div>
+
+                    <!-- Transformation & Scaling Explanation -->
+                    <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg text-blue-900 text-xs space-y-1.5">
+                        <h5 class="font-bold">⚡ Why Log Transformation & Z-Score Scaling Are Essential</h5>
+                        <p>
+                            <strong>A. Log Transformation:</strong> E-commerce spending has extreme high-end outliers. Applying <code class="bg-white px-1 py-0.5 rounded border border-blue-200">log(1 + x)</code> compresses long-tailed distributions into a normal curve.
+                        </p>
+                        <p>
+                            <strong>B. Z-Score Standardization:</strong> Since Monetary spend ranges in thousands ($) while Frequency ranges from 1 to 10, spend would artificially dominate K-Means. We scale all metrics to Mean = 0 and StdDev = 1 using: <code class="bg-white px-1 py-0.5 rounded border border-blue-200">Z = (X - Mean) / StdDev</code>.
+                        </p>
+                    </div>
+                </div>
+            </details>
+
             <!-- Column Header Selection -->
             <section id="secMapping" class="hidden bg-white p-5 rounded-xl shadow-sm border border-gray-200">
                 <h3 class="text-md font-semibold text-gray-800 mb-3">Map CSV Header Columns</h3>
