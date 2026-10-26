@@ -17,8 +17,8 @@
     <header class="bg-slate-900 text-white p-6 shadow-md">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight">Reliable SME RFM Segmentation Engine</h1>
-                <p class="text-slate-400 text-sm mt-1">Robust Analytics Architecture: Multi-Metric Cluster Optimization & Outlier Sanitation.</p>
+                <h1 class="text-2xl font-bold tracking-tight">Customer Segmentation Engine</h1>
+                <p class="text-slate-400 text-sm mt-1">Customer Segmentation based on Recency Frequency Monetary (RFM) Scores</p>
             </div>
         </div>
     </header>
@@ -40,12 +40,12 @@
                 </div>
 
                 <button id="btnDemoData" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 px-4 rounded-lg transition duration-150 border border-slate-300 text-sm">
-                    🎲 Load Sample Demo Data
+                    Load Sample Demo Data
                 </button>
             </div>
 
             <button id="btnRunPipeline" disabled class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow">
-                ⚙️ Run Diagnostic Engine
+                Click to Run the Analysis
             </button>
         </aside>
 
@@ -55,7 +55,7 @@
             <!-- Data Health Guidelines -->
             <details class="bg-white border border-blue-100 rounded-xl p-4 shadow-sm group">
                 <summary class="font-semibold text-blue-900 cursor-pointer flex justify-between items-center text-sm">
-                    <span>🛡️ Automated Data Reliability & Cleaning Protocols</span>
+                    <span>Please read this before uploading data</span>
                     <span class="group-open:rotate-180 transition-transform">▼</span>
                 </summary>
                 <div class="text-xs text-gray-600 mt-3 space-y-2 border-t pt-3 border-blue-50">
@@ -71,7 +71,7 @@
             <!-- NEW SECTION: HOW RFM CALCULATIONS ARE DONE -->
             <details class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm group" open>
                 <summary class="font-semibold text-slate-800 cursor-pointer flex justify-between items-center text-sm">
-                    <span>🧮 How RFM Metrics & Feature Scaling Are Calculated</span>
+                    <span>How RFM Metrics & Feature Scaling Are Calculated</span>
                     <span class="group-open:rotate-180 transition-transform">▼</span>
                 </summary>
                 <div class="text-xs text-gray-600 mt-3 border-t pt-3 border-slate-100 space-y-4">
@@ -108,7 +108,7 @@
 
                     <!-- Transformation & Scaling Explanation -->
                     <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg text-blue-900 text-xs space-y-1.5">
-                        <h5 class="font-bold">⚡ Why Log Transformation & Z-Score Scaling Are Essential</h5>
+                        <h5 class="font-bold">Why Log Transformation & Z-Score Scaling Are Essential</h5>
                         <p>
                             <strong>A. Log Transformation:</strong> E-commerce spending has extreme high-end outliers. Applying <code class="bg-white px-1 py-0.5 rounded border border-blue-200">log(1 + x)</code> compresses long-tailed distributions into a normal curve.
                         </p>
@@ -121,7 +121,7 @@
 
             <!-- Column Header Selection -->
             <section id="secMapping" class="hidden bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-                <h3 class="text-md font-semibold text-gray-800 mb-3">Map CSV Header Columns</h3>
+                <h3 class="text-md font-semibold text-gray-800 mb-3">Map CSV Header Columns Correctly</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-gray-600 mb-1">Customer ID</label>
@@ -152,7 +152,7 @@
             <!-- DIAGNOSTICS SECTION -->
             <section id="secDiagnostics" class="hidden bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex-col gap-5">
                 <div>
-                    <h3 class="text-lg font-bold text-gray-800">1. Cluster Reliability & Model Diagnostics</h3>
+                    <h3 class="text-lg font-bold text-gray-800">1. How to decide correct cluster size</h3>
                     <p class="text-xs text-gray-500 mt-1">Multi-metric diagnostic evaluation combining variance reduction and boundary isolation.</p>
                 </div>
 
@@ -181,7 +181,7 @@
                             <input type="range" id="sliderK" min="2" max="6" value="4" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                         </div>
                         <button id="btnFitModel" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm shadow flex-shrink-0">
-                            🚀 Generate Segmentations
+                            Generate Segmentations
                         </button>
                     </div>
                 </div>
@@ -478,8 +478,8 @@
             });
 
             // UI Recommendation Text
-            document.getElementById('recommendationBanner').innerHTML = `
-                📊 <strong>Reliability Engine Verdict:</strong> Recommended <strong>K = ${recommendedK}</strong> (Silhouette Quality: <strong>${bestBusinessSil.toFixed(3)}</strong>).<br>
+            document.getElementById('recommendationBanner').innerHTML =
+                 </strong> Recommended <strong>K = ${recommendedK}</strong> (Silhouette Quality: <strong>${bestBusinessSil.toFixed(3)}</strong>).<br>
                 <span class="text-xs font-normal text-blue-800">
                     * Note: While K=2 produces a higher raw boundary score (${silhouetteData.find(d => d.k===2).score.toFixed(3)}), 
                     <strong>K=${recommendedK}</strong> is recommended because it provides multi-tier actionable marketing groups without over-segmentation.
