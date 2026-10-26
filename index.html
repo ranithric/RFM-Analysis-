@@ -14,7 +14,7 @@
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold tracking-tight">Customer Segmentation Engine</h1>
-                <p class="text-slate-400 text-sm mt-1">Customer Segmentation based on Recency Frequency Monetary (RFM) Scores</p>
+                <p class="text-slate-400 text-sm mt-1">Customer Segmentation based on Recency, Frequency and Monetary (RFM) behaviour using K-means clustering</p>
             </div>
         </div>
     </header>
@@ -106,10 +106,9 @@
                         <p><strong>B. Z-Score Standardization:</strong> Since Monetary spend ranges in thousands ($) while Frequency ranges from 1 to 10, spend would artificially dominate K-Means. We scale all metrics to Mean = 0 and StdDev = 1 using: <code class="bg-white px-1 py-0.5 rounded border border-blue-200">Z = (X - Mean) / StdDev</code>.</p>
                     </div>
                     <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg space-y-1.5">
-                        <h5 class="font-bold text-slate-800">4. RFM scores, clusters &amp; segment names</h5>
-                        <p><strong>Scores (1–5):</strong> each customer is ranked against all other customers in your file for R, F and M. 5 = best (most recent, most orders, highest spend).</p>
+                        <h5 class="font-bold text-slate-800">4. Clusters &amp; segment names</h5>
                         <p><strong>Clusters (K):</strong> K-means groups customers with similar behaviour. The possible range of K and the recommended K are worked out from your data size and the silhouette score, so they change with every dataset.</p>
-                        <p><strong>Segment names:</strong> each cluster's average R, F and M scores are matched to the closest business profile (Champions, Loyal Customers, At Risk, Lost, etc.), and each name is used only once.</p>
+                        <p><strong>Segment names:</strong> each cluster is described by how its average recency, frequency and spend compare with all customers in your file (above or below average, measured in standard deviations). Clusters are ranked by overall value, and no fixed business profiles are used.</p>
                     </div>
                 </div>
             </details>
@@ -349,23 +348,6 @@ function parseDate(v, order) {
     return isNaN(t) ? NaN : t;
 }
 
-// ---------- RFM scoring (1-5 quintiles within the uploaded data) ----------
-function quintileScores(values, higherIsBetter) {
-    const n = values.length;
-    const idx = values.map((_, i) => i).sort((a, b) => values[a] - values[b]);
-    const avgRank = new Array(n);
-    for (let i = 0; i < n;) {
-        let j = i;
-        while (j + 1 < n && values[idx[j + 1]] === values[idx[i]]) j++;
-        for (let k = i; k <= j; k++) avgRank[idx[k]] = (i + j) / 2 + 0.5;
-        i = j + 1;
-    }
-    return avgRank.map(r => {
-        const s = Math.min(5, Math.max(1, Math.ceil((r / n) * 5)));
-        return higherIsBetter ? s : 6 - s;
-    });
-}
-
 function sampleRows(X, m) {
     if (X.length <= m) return X;
     const idx = X.map((_, i) => i);
@@ -419,11 +401,6 @@ function runPreprocessingAndDiagnostics() {
 
     const n = rfmBaseList.length;
     if (n < 10) { showAlert("❌ At least 10 customers with valid purchases are needed for meaningful segmentation."); return; }
-
-    const rS = quintileScores(rfmBaseList.map(r => r.Recency), false);
-    const fS = quintileScores(rfmBaseList.map(r => r.Frequency), true);
-    const mS = quintileScores(rfmBaseList.map(r => r.Monetary), true);
-    rfmBaseList.forEach((r, i) => { r.R = rS[i]; r.F = fS[i]; r.M = mS[i]; r.RFMScore = rS[i] + fS[i] + mS[i]; });
 
     const featureMatrix = rfmBaseList.map(r => [Math.log1p(r.Recency), Math.log1p(r.Frequency), Math.log1p(r.Monetary)]);
     const means = [0, 0, 0], stds = [0, 0, 0];
@@ -481,86 +458,53 @@ function runPreprocessingAndDiagnostics() {
     fitSelectedClusterModel();
 }
 
-// ---------- Business segments: 10 profiles, each used at most once ----------
-// proto = typical average [R, F, M] scores (1-5) for that kind of customer
-const SEGMENTS = [
-    { label: 'Champions', icon: '🏆', color: '#16a34a', proto: [4.7, 4.7, 4.7],
-      who: 'Buy often, spend the most, and bought recently. Your best customers.',
-      actions: ['Give early access to new products', 'Reward referrals and reviews', 'Send a personal thank-you'] },
-    { label: 'Loyal Customers', icon: '💙', color: '#2563eb', proto: [3.6, 4.3, 4.3],
-      who: 'Order regularly and spend well, but not quite as recently as Champions.',
-      actions: ['Offer loyalty points or bundle deals', 'Ask for reviews', 'Suggest premium products'] },
-    { label: 'Big Spenders', icon: '💎', color: '#0891b2', proto: [4.0, 2.5, 4.6],
-      who: 'Recent customers who spend a lot per order but do not order often.',
-      actions: ['Offer premium or bulk deals', 'Encourage a subscription or repeat order', 'Give personal service'] },
-    { label: 'Frequent Small Buyers', icon: '🛒', color: '#65a30d', proto: [4.0, 4.6, 2.5],
-      who: 'Order often and recently, but with small basket sizes.',
-      actions: ['Offer bundles to raise order value', 'Set a free-delivery minimum', 'Suggest add-on items'] },
-    { label: 'New / Promising', icon: '🌱', color: '#0d9488', proto: [4.6, 1.8, 2.2],
-      who: 'Bought recently but only a few times so far. Could become loyal.',
-      actions: ['Send a welcome message', 'Offer a small discount on the next order', 'Recommend related products'] },
-    { label: 'Needs Attention', icon: '👀', color: '#ca8a04', proto: [3, 3, 3],
-      who: 'Average customers who are starting to slow down.',
-      actions: ['Run a limited-time offer', 'Recommend items based on past orders', 'Reward a repeat purchase'] },
-    { label: 'About to Sleep', icon: '⏳', color: '#d97706', proto: [2.6, 2.4, 2.4],
-      who: 'Below-average activity and getting quieter. Easy to lose soon.',
-      actions: ['Send a friendly reminder', 'Share what is new', 'Offer a small incentive to return'] },
-    { label: 'At Risk', icon: '🚨', color: '#ea580c', proto: [1.8, 4.0, 4.0],
-      who: 'Used to spend a lot but have not bought for a long time. Worth winning back.',
-      actions: ['Call or message them personally', 'Send an exclusive comeback offer', 'Ask what went wrong'] },
-    { label: 'Hibernating', icon: '😴', color: '#7c3aed', proto: [1.8, 2.2, 2.2],
-      who: 'Spent little, ordered a few times, and have been quiet for a while.',
-      actions: ['Send a reactivation promo', 'Remind them with seasonal campaigns', 'Run a short win-back email series'] },
-    { label: 'Lost / Lapsed', icon: '👋', color: '#6b7280', proto: [1.1, 1.2, 1.2],
-      who: 'Gone for a long time, bought rarely, and spent very little.',
-      actions: ['Try one low-cost final win-back message', 'Send a short "why did you leave?" survey', 'Stop paid marketing if no reply'] }
-];
-
-// Gives every cluster a DIFFERENT business segment, choosing the best overall fit
-function assignSegments(clusters) {
-    const m = clusters.length, S = SEGMENTS.length;
-    const D = clusters.map(c => SEGMENTS.map(s => Math.hypot(c.R - s.proto[0], c.F - s.proto[1], c.M - s.proto[2])));
-    const usedG = new Array(S).fill(false), pg = [];
-    let cg = 0;
-    for (let i = 0; i < m; i++) {                       // quick greedy answer as a starting upper bound
-        let bj = -1;
-        for (let j = 0; j < S; j++) if (!usedG[j] && (bj < 0 || D[i][j] < D[i][bj])) bj = j;
-        usedG[bj] = true; pg[i] = bj; cg += D[i][bj];
-    }
-    let best = { cost: cg, pick: pg }, nodes = 0;
-    const used = new Array(S).fill(false), cur = [];
-    (function rec(i, cost) {
-        if (cost >= best.cost || ++nodes > 300000) return;
-        if (i === m) { best = { cost, pick: [...cur] }; return; }
-        const order = [...Array(S).keys()].sort((a, b) => D[i][a] - D[i][b]);
-        for (const j of order) {
-            if (used[j]) continue;
-            used[j] = true; cur[i] = j;
-            rec(i + 1, cost + D[i][j]);
-            used[j] = false;
-        }
-    })(0, 0);
-    return best.pick.map(j => SEGMENTS[j]);
+// ---------- Data-driven cluster naming (no hand-written profiles) ----------
+// Each cluster is described by where its centroid sits relative to the average
+// customer, using the z-scores of log(Recency), log(Frequency), log(Monetary).
+function describeClusters(clusters) {
+    clusters.forEach(p => p.value = p.zF + p.zM - p.zR);   // high F, high M, low recency = valuable
+    clusters.sort((a, b) => b.value - a.value);
+    const palette = ['#16a34a', '#65a30d', '#0891b2', '#2563eb', '#ca8a04', '#d97706', '#ea580c', '#dc2626', '#7c3aed', '#6b7280'];
+    const icons = ['🏆', '💙', '💎', '🛒', '🌱', '👀', '⏳', '🚨', '😴', '👋'];
+    clusters.forEach((p, i) => {
+        const recent = p.zR < -0.4, lapsed = p.zR > 0.4;
+        const rec = recent ? 'Recent' : lapsed ? 'Lapsed' : 'Average recency';
+        const frq = p.zF > 0.4 ? 'Frequent' : p.zF < -0.4 ? 'Infrequent' : 'Average frequency';
+        const mon = p.zM > 0.4 ? 'High spend' : p.zM < -0.4 ? 'Low spend' : 'Average spend';
+        const valuable = p.zM > 0.4 || p.zF > 0.4;
+        const actions = lapsed && valuable ? ['Personal win-back message', 'Exclusive comeback offer', 'Ask what went wrong']
+            : lapsed ? ['Low-cost reactivation promo', 'Seasonal reminder', 'Stop paid spend if no reply']
+            : recent && valuable ? ['Reward loyalty', 'Early access to new products', 'Ask for referrals']
+            : recent ? ['Welcome message', 'Small discount on next order', 'Recommend related items']
+            : ['Limited-time offer', 'Suggest items from past orders', 'Reward a repeat purchase'];
+        p.name = `#${i + 1} ${rec} · ${frq} · ${mon}`;   // rank keeps names unique
+        p.color = palette[i % palette.length];
+        p.def = {
+            icon: icons[i % icons.length],
+            who: `Ranked #${i + 1} of ${clusters.length} by value. Compared with your average customer: ${rec.toLowerCase()}, ${frq.toLowerCase()}, ${mon.toLowerCase()}.`,
+            actions
+        };
+    });
 }
 
 function fitSelectedClusterModel() {
     const n = rfmBaseList.length;
-    const kSelected = Math.min(parseInt(sliderK.value), n - 1, SEGMENTS.length);
+    const kSelected = Math.min(parseInt(sliderK.value), n - 1, 10);
     seed(2024);
     const model = runKMeansRobust(scaledFeatureMatrix, kSelected, n > 20000 ? 4 : 15);
     const rfmResult = rfmBaseList.map((r, i) => ({ ...r, Cluster: model.assignments[i] }));
 
-    const prof = Array.from({ length: kSelected }, (_, c) => ({ cluster: c, n: 0, R: 0, F: 0, M: 0, rec: 0, freq: 0, mon: 0 }));
-    rfmResult.forEach(r => {
-        const p = prof[r.Cluster];
-        p.n++; p.R += r.R; p.F += r.F; p.M += r.M; p.rec += r.Recency; p.freq += r.Frequency; p.mon += r.Monetary;
+    const prof = Array.from({ length: kSelected }, (_, c) =>
+        ({ cluster: c, n: 0, zR: 0, zF: 0, zM: 0, rec: 0, freq: 0, mon: 0 }));
+    rfmResult.forEach((r, i) => {
+        const p = prof[r.Cluster], z = scaledFeatureMatrix[i];
+        p.n++; p.zR += z[0]; p.zF += z[1]; p.zM += z[2];
+        p.rec += r.Recency; p.freq += r.Frequency; p.mon += r.Monetary;
     });
     const active = prof.filter(p => p.n > 0);
-    active.forEach(p => ['R', 'F', 'M', 'rec', 'freq', 'mon'].forEach(k => p[k] /= p.n));
+    active.forEach(p => ['zR', 'zF', 'zM', 'rec', 'freq', 'mon'].forEach(k => p[k] /= p.n));
 
-    const defs = assignSegments(active);
-    active.forEach((p, i) => { p.def = defs[i]; p.name = defs[i].label; p.color = defs[i].color; });
-    active.sort((a, b) => SEGMENTS.indexOf(a.def) - SEGMENTS.indexOf(b.def));
+    describeClusters(active);   // sorts and names in place
 
     const byCluster = {};
     active.forEach(p => byCluster[p.cluster] = p);
@@ -675,7 +619,7 @@ function renderResultsView(rfmList, segs) {
             x: sub.map(r => r.Frequency), y: sub.map(r => r.Monetary),
             text: sub.map(r => `Customer: ${r.CustomerID}<br>Last purchase: ${r.Recency} days ago`),
             mode: 'markers', name: s.name,
-            marker: { color: s.color, size: sub.map(r => 6 + r.R * 2) }
+            marker: { color: s.color, size: 8 }
         };
     });
     Plotly.newPlot('plotScatter', traces, {
@@ -704,7 +648,7 @@ function renderResultsView(rfmList, segs) {
     });
 
     const order = Object.fromEntries(segs.map((s, i) => [s.name, i]));
-    const sorted = [...rfmList].sort((a, b) => order[a.Segment] - order[b.Segment] || b.RFMScore - a.RFMScore);
+    const sorted = [...rfmList].sort((a, b) => order[a.Segment] - order[b.Segment] || b.Monetary - a.Monetary);
     const tbody = $('tableBody');
     tbody.innerHTML = '';
     sorted.slice(0, 100).forEach(r => {
@@ -722,9 +666,9 @@ function renderResultsView(rfmList, segs) {
 
 function downloadCSV() {
     if (!finalProcessedResults) return;
-    const rows = [["CustomerID", "Customer Segment", "Recency", "Frequency", "Monetary", "R Score", "F Score", "M Score", "RFM Score"].join(",")];
+    const rows = [["CustomerID", "Customer Segment", "Recency", "Frequency", "Monetary"].join(",")];
     finalProcessedResults.forEach(r => rows.push([
-        `"${String(r.CustomerID).replace(/"/g, '""')}"`, `"${r.Segment}"`, r.Recency, r.Frequency, r.Monetary.toFixed(2), r.R, r.F, r.M, r.RFMScore
+        `"${String(r.CustomerID).replace(/"/g, '""')}"`, `"${r.Segment}"`, r.Recency, r.Frequency, r.Monetary.toFixed(2)
     ].join(",")));
     const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" }));
     const a = document.createElement("a");
