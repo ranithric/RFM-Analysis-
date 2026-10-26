@@ -477,11 +477,33 @@ function describeClusters(clusters) {
             : recent && valuable ? ['Reward loyalty', 'Early access to new products', 'Ask for referrals']
             : recent ? ['Welcome message', 'Small discount on next order', 'Recommend related items']
             : ['Limited-time offer', 'Suggest items from past orders', 'Reward a repeat purchase'];
-        p.name = `#${i + 1} ${rec} · ${frq} · ${mon}`;   // rank keeps names unique
+        // Use business-friendly labels instead of technical RFM descriptions.
+        const recKey = recent ? 'recent' : lapsed ? 'lapsed' : 'average';
+        const frqKey = p.zF > 0.4 ? 'frequent' : p.zF < -0.4 ? 'infrequent' : 'average';
+        const monKey = p.zM > 0.4 ? 'high' : p.zM < -0.4 ? 'low' : 'average';
+        const friendlyNames = {
+            'recent|frequent|high': 'Champions',
+            'average|frequent|high': 'Loyal High-Value Customers',
+            'recent|frequent|average': 'Regular Recent Buyers',
+            'recent|infrequent|average': 'Recent Occasional Buyers',
+            'average|average|average': 'Steady Customers',
+            'lapsed|frequent|average': 'At-Risk Regular Customers',
+            'recent|infrequent|low': 'Recent Low-Spend Customers',
+            'lapsed|average|low': 'Inactive Low-Spend Customers',
+            'average|infrequent|low': 'Occasional Low-Spend Customers',
+            'lapsed|infrequent|low': 'Inactive Occasional Customers'
+        };
+        const profileKey = `${recKey}|${frqKey}|${monKey}`;
+        const baseName = friendlyNames[profileKey] ||
+            `${recKey === 'recent' ? 'Recent' : recKey === 'lapsed' ? 'Inactive' : 'Steady'} ${frqKey === 'frequent' ? 'Frequent' : frqKey === 'infrequent' ? 'Occasional' : 'Regular'} ${monKey === 'high' ? 'High-Value' : monKey === 'low' ? 'Low-Spend' : 'Customers'}`;
+        // Keep labels unique if multiple clusters share the same RFM profile.
+        const duplicateCount = clusters.slice(0, i).filter(c => c.name === baseName || c.baseName === baseName).length;
+        p.baseName = baseName;
+        p.name = duplicateCount ? `${baseName} – Group ${duplicateCount + 1}` : baseName;
         p.color = palette[i % palette.length];
         p.def = {
             icon: icons[i % icons.length],
-            who: `Ranked #${i + 1} of ${clusters.length} by value. Compared with your average customer: ${rec.toLowerCase()}, ${frq.toLowerCase()}, ${mon.toLowerCase()}.`,
+            who: `Compared with the average customer, this group tends to have ${rec.toLowerCase()}, ${frq.toLowerCase()} and ${mon.toLowerCase()}.`,
             actions
         };
     });
