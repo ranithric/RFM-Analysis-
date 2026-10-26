@@ -72,9 +72,6 @@
                         <li><strong>Check the Column Mapping:</strong> After uploading, a "Map CSV Header Columns Correctly" section appears. Make sure each field points to the correct column in your file (e.g., <em>Order Date</em> → your date column, <em>Order ID</em> → your invoice/order number). Each of the 5 fields needs a <strong>different</strong> column. If two fields share the same column, the analysis will not run.</li>
                         <li><strong>Date Format:</strong> Most formats work (e.g. <code class="bg-blue-50 px-1 rounded">2026-06-30</code>, <code class="bg-blue-50 px-1 rounded">30/06/2026</code>, <code class="bg-blue-50 px-1 rounded">06/30/2026</code>). Use "Data Settings" if day/month order is unclear. Rows with unreadable dates are dropped.</li><li><strong>Currency &amp; Refunds:</strong> Set your currency symbol in "Data Settings". Rows with negative amounts are ignored unless you tick the refunds option.</li>
                         <li><strong>Missing Data:</strong> Automatically drops incomplete invoice rows, including rows with a price or quantity of zero or below.</li>
-                        <li><strong>Log1p Variance Stabilization:</strong> Reduces right-skewness in transaction spend.</li>
-                        <li><strong>Z-Score Standardization:</strong> Equalizes feature variance across Recency, Frequency, and Monetary values.</li>
-                        <li><strong>Multi-Metric Optimization:</strong> Evaluates Silhouette Scores and Elbow Method to recommend actionable business clusters.</li>
                     </ul>
                 </div>
             </details>
