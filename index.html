@@ -4,16 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reliable SME RFM Segmentation Engine</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Plotly.js CDN -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <!-- PapaParse CDN for CSV Handling -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
 
-    <!-- Header -->
     <header class="bg-slate-900 text-white p-6 shadow-md">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div>
@@ -25,231 +21,167 @@
 
     <div class="max-w-7xl mx-auto w-full p-6 flex-grow grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-        <!-- Sidebar -->
         <aside class="lg:col-span-1 bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-6">
             <div>
                 <h2 class="text-lg font-semibold border-b pb-2 mb-4 text-slate-800">📁 Data Ingestion</h2>
-                
                 <label class="block text-sm font-medium text-gray-700 mb-2">Upload Transaction CSV</label>
                 <input type="file" id="csvFileInput" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border rounded-lg p-1"/>
-                
                 <div class="relative flex py-3 items-center">
                     <div class="flex-grow border-t border-gray-200"></div>
                     <span class="flex-shrink mx-2 text-gray-400 text-xs uppercase font-bold">OR</span>
                     <div class="flex-grow border-t border-gray-200"></div>
                 </div>
-
                 <button id="btnDemoData" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 px-4 rounded-lg transition duration-150 border border-slate-300 text-sm">
                     Load Sample Demo Data
                 </button>
             </div>
-
+            <div class="border-t pt-4 flex flex-col gap-3">
+                <h3 class="text-sm font-semibold text-slate-800">⚙️ Data Settings</h3>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Currency symbol</label>
+                    <input id="currencyInput" type="text" value="$" maxlength="4" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white" placeholder="$, €, £, Rs">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Date format in your file</label>
+                    <select id="dateFormat" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white">
+                        <option value="auto">Auto-detect</option>
+                        <option value="DMY">Day / Month / Year</option>
+                        <option value="MDY">Month / Day / Year</option>
+                    </select>
+                </div>
+                <label class="flex items-start gap-2 text-xs text-gray-600">
+                    <input id="chkReturns" type="checkbox" class="mt-0.5">
+                    <span>My file has refunds/returns as negative amounts (subtract them from spend)</span>
+                </label>
+            </div>
             <button id="btnRunPipeline" disabled class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow">
                 Click to Run the Analysis
             </button>
         </aside>
 
-        <!-- Main Workspace -->
         <main class="lg:col-span-3 flex flex-col gap-6">
 
-            <!-- Data Health Guidelines -->
-<details class="bg-white border border-blue-100 rounded-xl p-4 shadow-sm group">
-    <summary class="font-semibold text-blue-900 cursor-pointer flex justify-between items-center text-sm">
-        <span>Please Read this Before Uploading Data</span>
-        <span class="group-open:rotate-180 transition-transform">▼</span>
-    </summary>
-    <div class="text-xs text-gray-600 mt-3 space-y-2 border-t pt-3 border-blue-50">
-        <ul class="list-disc list-inside space-y-1">
-            <li><strong>Required CSV Columns:</strong> Your file must have a header row with these 5 columns: <em>Customer ID, Order Date, Order ID, Unit Price, Quantity</em>. Each row should represent one purchased item or order line.</li>
-            <li><strong>Check the Column Mapping:</strong> After uploading, a "Map CSV Header Columns Correctly" section appears. Make sure each field points to the correct column in your file (e.g., <em>Order Date</em> → your date column, <em>Order ID</em> → your invoice/order number). Each of the 5 fields needs a <strong>different</strong> column. If two fields share the same column, the analysis will not run.</li>
-            <li><strong>Date Format:</strong> Use a standard format such as <code class="bg-blue-50 px-1 rounded">YYYY-MM-DD</code>. Rows with unreadable dates are dropped.</li>
-            <li><strong>Missing Data:</strong> Automatically drops incomplete invoice rows, including rows with a price or quantity of zero or below.</li>
-            <li><strong>Log1p Variance Stabilization:</strong> Reduces right-skewness in transaction spend.</li>
-            <li><strong>Z-Score Standardization:</strong> Equalizes feature variance across Recency, Frequency, and Monetary values.</li>
-            <li><strong>Multi-Metric Optimization:</strong> Evaluates Silhouette Scores and Elbow Method to recommend actionable business clusters.</li>
-        </ul>
-    </div>
-</details>
+            <details class="bg-white border border-blue-100 rounded-xl p-4 shadow-sm group">
+                <summary class="font-semibold text-blue-900 cursor-pointer flex justify-between items-center text-sm">
+                    <span>Please read this before uploading data</span>
+                    <span class="group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div class="text-xs text-gray-600 mt-3 space-y-2 border-t pt-3 border-blue-50">
+                    <ul class="list-disc list-inside space-y-1">
+                        <li><strong>Required CSV Columns:</strong> A header row with at least <em>Customer ID, Order Date</em> and <em>Unit Price (or a total Amount)</em>. <em>Order ID</em> and <em>Quantity</em> are optional: if your file has no order number, each row counts as one order; if it has no quantity, quantity is taken as 1. Each row should represent one purchase line.</li>
+                        <li><strong>Check the Column Mapping:</strong> After uploading, a "Map CSV Header Columns Correctly" section appears. Make sure each field points to the correct column in your file (e.g., <em>Order Date</em> → your date column, <em>Order ID</em> → your invoice/order number). Each of the 5 fields needs a <strong>different</strong> column. If two fields share the same column, the analysis will not run.</li>
+                        <li><strong>Date Format:</strong> Most formats work (e.g. <code class="bg-blue-50 px-1 rounded">2026-06-30</code>, <code class="bg-blue-50 px-1 rounded">30/06/2026</code>, <code class="bg-blue-50 px-1 rounded">06/30/2026</code>). Use "Data Settings" if day/month order is unclear. Rows with unreadable dates are dropped.</li><li><strong>Currency &amp; Refunds:</strong> Set your currency symbol in "Data Settings". Rows with negative amounts are ignored unless you tick the refunds option.</li>
+                        <li><strong>Missing Data:</strong> Automatically drops incomplete invoice rows, including rows with a price or quantity of zero or below.</li>
+                        <li><strong>Log1p Variance Stabilization:</strong> Reduces right-skewness in transaction spend.</li>
+                        <li><strong>Z-Score Standardization:</strong> Equalizes feature variance across Recency, Frequency, and Monetary values.</li>
+                        <li><strong>Multi-Metric Optimization:</strong> Evaluates Silhouette Scores and Elbow Method to recommend actionable business clusters.</li>
+                    </ul>
+                </div>
+            </details>
 
-            <!-- NEW SECTION: HOW RFM CALCULATIONS ARE DONE -->
             <details class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm group">
                 <summary class="font-semibold text-slate-800 cursor-pointer flex justify-between items-center text-sm">
                     <span>How RFM Metrics & Feature Scaling Are Calculated</span>
                     <span class="group-open:rotate-180 transition-transform">▼</span>
                 </summary>
                 <div class="text-xs text-gray-600 mt-3 border-t pt-3 border-slate-100 space-y-4">
-                    <p class="leading-relaxed">
-                        To cluster customers accurately, raw transaction rows are aggregated per unique customer ID and transformed using the following mathematical pipeline:
-                    </p>
-
-                    <!-- Cards Layout -->
+                    <p class="leading-relaxed">To cluster customers accurately, raw transaction rows are aggregated per unique customer ID and transformed using the following mathematical pipeline:</p>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg">
                             <h5 class="font-bold text-slate-800 text-xs mb-1">1. Recency (R)</h5>
                             <p class="text-slate-500 mb-2">Days since last purchase relative to max date in file.</p>
-                            <code class="block bg-white p-2 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">
-                                R = (MaxDate + 1) - LastOrderDate
-                            </code>
+                            <code class="block bg-white p-2 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">R = (MaxDate + 1) - LastOrderDate</code>
                         </div>
-
                         <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg">
                             <h5 class="font-bold text-slate-800 text-xs mb-1">2. Frequency (F)</h5>
                             <p class="text-slate-500 mb-2">Total count of distinct invoice numbers per customer.</p>
-                            <code class="block bg-white p-2 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">
-                                F = CountDistinct(OrderID)
-                            </code>
+                            <code class="block bg-white p-2 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">F = CountDistinct(OrderID)</code>
                         </div>
-
                         <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg">
                             <h5 class="font-bold text-slate-800 text-xs mb-1">3. Monetary (M)</h5>
                             <p class="text-slate-500 mb-2">Cumulative revenue generated across all transactions.</p>
-                            <code class="block bg-white p-2 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">
-                                M = Sum(UnitPrice × Quantity)
-                            </code>
+                            <code class="block bg-white p-2 rounded border border-slate-200 text-blue-600 font-mono text-[11px]">M = Sum(UnitPrice × Quantity)</code>
                         </div>
                     </div>
-
-                    <!-- Transformation & Scaling Explanation -->
                     <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg text-blue-900 text-xs space-y-1.5">
                         <h5 class="font-bold">Why Log Transformation & Z-Score Scaling Are Essential</h5>
-                        <p>
-                            <strong>A. Log Transformation:</strong> E-commerce spending has extreme high-end outliers. Applying <code class="bg-white px-1 py-0.5 rounded border border-blue-200">log(1 + x)</code> compresses long-tailed distributions into a normal curve.
-                        </p>
-                        <p>
-                            <strong>B. Z-Score Standardization:</strong> Since Monetary spend ranges in thousands ($) while Frequency ranges from 1 to 10, spend would artificially dominate K-Means. We scale all metrics to Mean = 0 and StdDev = 1 using: <code class="bg-white px-1 py-0.5 rounded border border-blue-200">Z = (X - Mean) / StdDev</code>.
-                        </p>
+                        <p><strong>A. Log Transformation:</strong> E-commerce spending has extreme high-end outliers. Applying <code class="bg-white px-1 py-0.5 rounded border border-blue-200">log(1 + x)</code> compresses long-tailed distributions into a normal curve.</p>
+                        <p><strong>B. Z-Score Standardization:</strong> Since Monetary spend ranges in thousands ($) while Frequency ranges from 1 to 10, spend would artificially dominate K-Means. We scale all metrics to Mean = 0 and StdDev = 1 using: <code class="bg-white px-1 py-0.5 rounded border border-blue-200">Z = (X - Mean) / StdDev</code>.</p>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg space-y-1.5">
+                        <h5 class="font-bold text-slate-800">4. RFM scores, clusters &amp; segment names</h5>
+                        <p><strong>Scores (1–5):</strong> each customer is ranked against all other customers in your file for R, F and M. 5 = best (most recent, most orders, highest spend).</p>
+                        <p><strong>Clusters (K):</strong> K-means groups customers with similar behaviour. The possible range of K and the recommended K are worked out from your data size and the silhouette score, so they change with every dataset.</p>
+                        <p><strong>Segment names:</strong> each cluster's average R, F and M scores are matched to the closest business profile (Champions, Loyal Customers, At Risk, Lost, etc.), and each name is used only once.</p>
                     </div>
                 </div>
             </details>
 
-            <!-- Column Header Selection -->
             <section id="secMapping" class="hidden bg-white p-5 rounded-xl shadow-sm border border-gray-200">
                 <h3 class="text-md font-semibold text-gray-800 mb-3">Map CSV Header Columns Correctly</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Customer ID</label>
-                        <select id="mapId" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Order Date</label>
-                        <select id="mapDate" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Order ID</label>
-                        <select id="mapOrder" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Unit Price</label>
-                        <select id="mapPrice" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-                        <select id="mapQty" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select>
-                    </div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Customer ID</label><select id="mapId" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select></div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Order Date</label><select id="mapDate" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select></div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Order ID <span class="font-normal text-gray-400">(optional)</span></label><select id="mapOrder" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select></div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Unit Price or Amount</label><select id="mapPrice" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select></div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Quantity <span class="font-normal text-gray-400">(optional)</span></label><select id="mapQty" class="w-full text-xs border border-gray-300 rounded-lg p-2 bg-white focus:ring-blue-500 focus:border-blue-500"></select></div>
                 </div>
             </section>
 
-            <!-- Notification Banner -->
             <div id="alertBox" class="hidden p-4 rounded-xl text-sm font-medium border"></div>
 
-            <!-- DIAGNOSTICS SECTION -->
             <section id="secDiagnostics" class="hidden bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex-col gap-5">
                 <div>
                     <h3 class="text-lg font-bold text-gray-800">1. How to decide correct cluster size</h3>
                     <p class="text-xs text-gray-500 mt-1">Multi-metric diagnostic evaluation combining variance reduction and boundary isolation.</p>
                 </div>
-
                 <div id="recommendationBanner" class="bg-blue-50 p-4 rounded-xl text-sm font-semibold text-blue-900 border border-blue-200"></div>
-
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="border p-4 rounded-xl">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">A. Elbow Method (WCSS Variance)</h4>
-                        <div id="plotElbow" class="w-full h-64"></div>
-                    </div>
-
-                    <div class="border p-4 rounded-xl">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">B. Silhouette Quality Score</h4>
-                        <div id="plotSilhouette" class="w-full h-64"></div>
-                    </div>
+                    <div class="border p-4 rounded-xl"><h4 class="text-sm font-semibold text-gray-700 mb-2">A. Elbow Method (WCSS Variance)</h4><div id="plotElbow" class="w-full h-64"></div></div>
+                    <div class="border p-4 rounded-xl"><h4 class="text-sm font-semibold text-gray-700 mb-2">B. Silhouette Quality Score</h4><div id="plotSilhouette" class="w-full h-64"></div></div>
                 </div>
-
-                <!-- Interactive K Selector -->
                 <div class="border-t pt-5 mt-2 bg-slate-50 p-4 rounded-xl border-slate-200">
-                    <h4 class="text-md font-bold text-slate-800 mb-2">2. Confirm Final Cluster Count (K) </h4>
+                    <h4 class="text-md font-bold text-slate-800 mb-1">2. Confirm Final Cluster Count (K)</h4>
                     <p class="text-xs text-gray-600 mb-3">💬 <strong>Your choice:</strong> You can decide your own cluster size and click <strong>'Generate Segmentations'</strong> based on the analysis and your choices, rather than going with the recommended clusters.</p>
                     <div class="flex items-center gap-4">
                         <div class="flex-grow">
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">
-                                Selected Clusters (K): <span id="kValDisplay" class="font-bold text-blue-600 text-base">4</span>
-                            </label>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Selected Clusters (K): <span id="kValDisplay" class="font-bold text-blue-600 text-base">4</span> <span id="kRangeHint" class="font-normal text-gray-500 ml-2"></span></label>
                             <input type="range" id="sliderK" min="2" max="6" value="4" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                         </div>
-                        <button id="btnFitModel" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm shadow flex-shrink-0">
-                            Generate Segmentations
-                        </button>
+                        <button id="btnFitModel" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-6 rounded-lg transition text-sm shadow flex-shrink-0">Generate Segmentations</button>
                     </div>
                 </div>
             </section>
 
-            <!-- RESULTS SECTION -->
             <section id="secResults" class="hidden flex-col gap-6">
-                <!-- KPIs -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="bg-white p-4 rounded-xl border shadow-sm">
-                        <p class="text-xs text-gray-500 font-medium">Total Customers</p>
-                        <p id="metricTotalCust" class="text-xl font-bold text-gray-800 mt-1">-</p>
-                    </div>
-                    <div class="bg-white p-4 rounded-xl border shadow-sm">
-                        <p class="text-xs text-gray-500 font-medium">Avg Recency (Days)</p>
-                        <p id="metricAvgRecency" class="text-xl font-bold text-gray-800 mt-1">-</p>
-                    </div>
-                    <div class="bg-white p-4 rounded-xl border shadow-sm">
-                        <p class="text-xs text-gray-500 font-medium">Avg Frequency (Orders)</p>
-                        <p id="metricAvgFreq" class="text-xl font-bold text-gray-800 mt-1">-</p>
-                    </div>
-                    <div class="bg-white p-4 rounded-xl border shadow-sm">
-                        <p class="text-xs text-gray-500 font-medium">Avg Spend ($)</p>
-                        <p id="metricAvgSpend" class="text-xl font-bold text-gray-800 mt-1">-</p>
-                    </div>
+                    <div class="bg-white p-4 rounded-xl border shadow-sm"><p class="text-xs text-gray-500 font-medium">Total Customers</p><p id="metricTotalCust" class="text-xl font-bold text-gray-800 mt-1">-</p></div>
+                    <div class="bg-white p-4 rounded-xl border shadow-sm"><p class="text-xs text-gray-500 font-medium">Avg Recency (Days)</p><p id="metricAvgRecency" class="text-xl font-bold text-gray-800 mt-1">-</p></div>
+                    <div class="bg-white p-4 rounded-xl border shadow-sm"><p class="text-xs text-gray-500 font-medium">Avg Frequency (Orders)</p><p id="metricAvgFreq" class="text-xl font-bold text-gray-800 mt-1">-</p></div>
+                    <div class="bg-white p-4 rounded-xl border shadow-sm"><p class="text-xs text-gray-500 font-medium">Avg Spend (<span class="cur">$</span>)</p><p id="metricAvgSpend" class="text-xl font-bold text-gray-800 mt-1">-</p></div>
                 </div>
-
-                <!-- Plotly Charts -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-white p-4 rounded-xl border shadow-sm">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">Customer Segment Distribution</h4>
-                        <div id="plotPie" class="w-full h-80"></div>
-                    </div>
-                    <div class="bg-white p-4 rounded-xl border shadow-sm">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">Frequency vs Spend (Log Scale)</h4>
-                        <div id="plotScatter" class="w-full h-80"></div>
-                    </div>
+                    <div class="bg-white p-4 rounded-xl border shadow-sm"><h4 class="text-sm font-semibold text-gray-700 mb-2">Customer Segment Distribution</h4><div id="plotPie" class="w-full h-80"></div></div>
+                    <div class="bg-white p-4 rounded-xl border shadow-sm"><h4 class="text-sm font-semibold text-gray-700 mb-2">Frequency vs Spend (Log Scale)</h4><div id="plotScatter" class="w-full h-80"></div></div>
                 </div>
-
-                <!-- Action Plans -->
                 <div class="bg-white p-5 rounded-xl border shadow-sm">
                     <h4 class="text-md font-bold text-gray-800 mb-3">🎯 Low-Cost SME Marketing Action Plans</h4>
                     <div id="smeStrategyContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 </div>
-
-                <!-- Export Data Table -->
                 <div class="bg-white p-5 rounded-xl border shadow-sm">
                     <div class="flex justify-between items-center mb-4">
                         <h4 class="text-sm font-semibold text-gray-700">Segmented Customer List</h4>
-                        <button id="btnDownload" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold py-1.5 px-3 rounded-lg shadow transition">
-                            📥 Download Results (CSV)
-                        </button>
+                        <button id="btnDownload" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold py-1.5 px-3 rounded-lg shadow transition">📥 Download Results (CSV)</button>
                     </div>
                     <div class="max-h-64 overflow-y-auto border rounded-lg">
                         <table class="w-full text-left text-xs border-collapse">
-                            <thead class="bg-gray-100 sticky top-0 border-b">
-                                <tr>
-                                    <th class="p-2.5 font-semibold text-gray-700">Customer ID</th>
-                                    <th class="p-2.5 font-semibold text-gray-700">Customer Segment</th>
-                                    <th class="p-2.5 font-semibold text-gray-700">Recency (Days)</th>
-                                    <th class="p-2.5 font-semibold text-gray-700">Frequency (Orders)</th>
-                                    <th class="p-2.5 font-semibold text-gray-700">Monetary ($)</th>
-                                </tr>
-                            </thead>
+                            <thead class="bg-gray-100 sticky top-0 border-b"><tr>
+                                <th class="p-2.5 font-semibold text-gray-700">Customer ID</th>
+                                <th class="p-2.5 font-semibold text-gray-700">Customer Segment</th>
+                                <th class="p-2.5 font-semibold text-gray-700">Recency (Days)</th>
+                                <th class="p-2.5 font-semibold text-gray-700">Frequency (Orders)</th>
+                                <th class="p-2.5 font-semibold text-gray-700">Monetary (<span class="cur">$</span>)</th>
+                            </tr></thead>
                             <tbody id="tableBody" class="divide-y"></tbody>
                         </table>
                     </div>
@@ -258,31 +190,40 @@
         </main>
     </div>
 
-    <!-- Footer -->
     <footer class="bg-white border-t p-4 text-center text-xs text-gray-500 mt-auto">
         © 2026 Ranithri Hewasiliyan. All Rights Reserved.
     </footer>
 
-    <!-- SCRIPT LOGIC -->
     <script>
-        let rawDataset = null, rfmBaseList = null, scaledFeatureMatrix = null, finalProcessedResults = null;
-
+let rawDataset = null, rfmBaseList = null, scaledFeatureMatrix = null, finalProcessedResults = null, CUR = '$';
+const NONE = '__none__';
 const $ = (id) => document.getElementById(id);
 const csvFileInput = $('csvFileInput'), btnDemoData = $('btnDemoData'), btnRunPipeline = $('btnRunPipeline');
-const btnFitModel = $('btnFitModel'), sliderK = $('sliderK'), kValDisplay = $('kValDisplay');
+const btnFitModel = $('btnFitModel'), sliderK = $('sliderK'), kValDisplay = $('kValDisplay'), kRangeHint = $('kRangeHint');
 const secMapping = $('secMapping'), secDiagnostics = $('secDiagnostics'), secResults = $('secResults'), alertBox = $('alertBox');
 const mapId = $('mapId'), mapDate = $('mapDate'), mapOrder = $('mapOrder'), mapPrice = $('mapPrice'), mapQty = $('mapQty');
-
-const PALETTE = ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f'];
+const currencyInput = $('currencyInput'), dateFormatSel = $('dateFormat'), returnsChk = $('chkReturns');
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// Seeded random generator: the same data always gives the same clusters
+let _s = 1;
+function seed(v) { _s = v >>> 0; }
+function rnd() {
+    _s = (_s + 0x6D2B79F5) >>> 0;
+    let t = _s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 sliderK.addEventListener('input', (e) => kValDisplay.textContent = e.target.value);
+btnRunPipeline.addEventListener('click', runPreprocessingAndDiagnostics);
+btnFitModel.addEventListener('click', fitSelectedClusterModel);
+$('btnDownload').addEventListener('click', downloadCSV);
 
 btnDemoData.addEventListener('click', () => {
     rawDataset = generateSyntheticData(1500, 200);
-    populateMappingDropdowns();
-    btnRunPipeline.disabled = false;
-    hideAlert();
+    loadedNewData();
 });
 
 csvFileInput.addEventListener('change', (e) => {
@@ -291,44 +232,38 @@ csvFileInput.addEventListener('change', (e) => {
     Papa.parse(file, {
         header: true, skipEmptyLines: true,
         complete: (results) => {
-            if (results.data && results.data.length > 0) {
-                rawDataset = results.data;
-                populateMappingDropdowns();
-                btnRunPipeline.disabled = false;
-                hideAlert();
-            } else showAlert("❌ Could not parse valid CSV records.");
+            if (results.data && results.data.length > 0) { rawDataset = results.data; loadedNewData(); }
+            else showAlert("❌ Could not parse valid CSV records.");
         },
         error: (err) => showAlert(`❌ CSV Parse Error: ${err.message}`)
     });
 });
 
-btnRunPipeline.addEventListener('click', runPreprocessingAndDiagnostics);
-btnFitModel.addEventListener('click', fitSelectedClusterModel);
-$('btnDownload').addEventListener('click', downloadCSV);
-
+function loadedNewData() {
+    populateMappingDropdowns();
+    btnRunPipeline.disabled = false;
+    hideAlert();
+    [secDiagnostics, secResults].forEach(s => { s.classList.add('hidden'); s.classList.remove('flex'); });
+}
 function showAlert(msg) {
     alertBox.className = 'p-4 rounded-xl text-sm font-medium border bg-red-50 text-red-800 border-red-200 block';
     alertBox.innerHTML = msg;
 }
 function hideAlert() { alertBox.className = 'hidden'; }
 
-// ---------- Smarter column auto-detection (no column is picked twice) ----------
+// ---------- Column auto-detection (no column is picked twice) ----------
 function populateMappingDropdowns() {
     if (!rawDataset || rawDataset.length === 0) return;
     const cols = Object.keys(rawDataset[0]);
     const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    // Each field: patterns in priority order (first pattern = best match)
     const fields = [
-        { el: mapId,    pats: ['customerid', 'custid', 'clientid', 'userid', 'customer', 'cust', 'client', 'user'] },
+        { el: mapId,    pats: ['customerid', 'custid', 'clientid', 'userid', 'customer', 'cust', 'client', 'user', 'member', 'account'] },
         { el: mapDate,  pats: ['orderdate', 'invoicedate', 'purchasedate', 'transactiondate', 'date', 'time'] },
-        { el: mapOrder, pats: ['orderid', 'invoiceno', 'invoiceid', 'invoice', 'transactionid', 'txn', 'ordernumber', 'order'] },
-        { el: mapPrice, pats: ['unitprice', 'price', 'rate', 'cost'] },
+        { el: mapOrder, pats: ['orderid', 'invoiceno', 'invoiceid', 'invoice', 'transactionid', 'txn', 'ordernumber', 'order', 'receipt'] },
+        { el: mapPrice, pats: ['unitprice', 'price', 'amount', 'total', 'sales', 'revenue', 'rate', 'cost'] },
         { el: mapQty,   pats: ['quantity', 'qty', 'units', 'count'] }
     ];
-
-    const used = new Set();
-    const choice = new Map();
+    const used = new Set(), choice = new Map();
     fields.forEach(f => {
         let pick = null;
         for (const p of f.pats) {
@@ -338,22 +273,18 @@ function populateMappingDropdowns() {
         if (pick) used.add(pick);
         choice.set(f.el, pick);
     });
-    // Fallback for fields with no match: first unused column
     fields.forEach(f => {
         if (!choice.get(f.el)) {
-            const free = cols.find(c => !used.has(c)) || cols[0];
-            used.add(free);
-            choice.set(f.el, free);
+            // Optional fields fall back to "None"; required fields take the first unused column
+            if (f.el === mapOrder || f.el === mapQty) choice.set(f.el, NONE);
+            else { const free = cols.find(c => !used.has(c)) || cols[0]; used.add(free); choice.set(f.el, free); }
         }
     });
-
     fields.forEach(({ el }) => {
         el.innerHTML = '';
-        cols.forEach(col => {
-            const opt = document.createElement('option');
-            opt.value = col; opt.textContent = col;
-            el.appendChild(opt);
-        });
+        if (el === mapOrder) el.add(new Option('— None (each row is one order) —', NONE));
+        if (el === mapQty) el.add(new Option('— None (quantity = 1) —', NONE));
+        cols.forEach(col => el.add(new Option(col, col)));
         el.value = choice.get(el);
     });
     secMapping.classList.remove('hidden');
@@ -363,25 +294,22 @@ function generateSyntheticData(numRows = 1500, numCust = 200) {
     const custIds = Array.from({ length: numCust }, (_, i) => `CUST-${1000 + i}`);
     const rows = [];
     const baseTime = new Date('2026-06-30T00:00:00').getTime();
-    // Each customer gets a behaviour profile so the demo has real, discoverable segments
     const profiles = custIds.map(() => {
         const t = Math.random();
-        if (t < 0.15) return { w: 5, maxAgo: 60,  price: 3 };   // frequent, recent, high spend
-        if (t < 0.45) return { w: 3, maxAgo: 150, price: 2 };   // regular
-        if (t < 0.70) return { w: 1, maxAgo: 60,  price: 1.5 }; // new / occasional
-        return { w: 1, maxAgo: 365, price: 1 };                 // old, inactive
+        if (t < 0.15) return { w: 5, maxAgo: 60, price: 3 };
+        if (t < 0.45) return { w: 3, maxAgo: 150, price: 2 };
+        if (t < 0.70) return { w: 1, maxAgo: 60, price: 1.5 };
+        return { w: 1, maxAgo: 365, price: 1 };
     });
     const weights = profiles.map(p => p.w), totalW = weights.reduce((a, b) => a + b, 0);
     const pickCust = () => { let r = Math.random() * totalW; for (let i = 0; i < weights.length; i++) { r -= weights[i]; if (r <= 0) return i; } return 0; };
-    let invCounter = 50000;
-    const orderCount = Math.round(numRows / 3);
-    for (let o = 0; o < orderCount; o++) {
+    let inv = 50000;
+    for (let o = 0; o < Math.round(numRows / 3); o++) {
         const ci = pickCust(), p = profiles[ci];
         const daysAgo = Math.floor(Math.random() * p.maxAgo) + (p.maxAgo === 365 ? 120 : 0);
         const orderDate = new Date(baseTime - Math.min(daysAgo, 364) * 86400000).toISOString().split('T')[0];
-        const invoice = `INV-${invCounter++}`;
-        const lines = 1 + Math.floor(Math.random() * 5);
-        for (let l = 0; l < lines; l++) {
+        const invoice = `INV-${inv++}`;
+        for (let l = 0, lines = 1 + Math.floor(Math.random() * 5); l < lines; l++) {
             rows.push({
                 CustomerID: custIds[ci], OrderDate: orderDate, OrderID: invoice,
                 UnitPrice: parseFloat(((Math.exp(Math.random() * 2) + 1.5) * p.price).toFixed(2)),
@@ -392,111 +320,155 @@ function generateSyntheticData(numRows = 1500, numCust = 200) {
     return rows;
 }
 
-// ---------- RFM scoring (1-5 quintiles, rank-based so ties are handled fairly) ----------
+// ---------- Flexible parsing of numbers and dates ----------
+function parseNum(v) {
+    if (typeof v === 'number') return v;
+    let s = String(v ?? '').trim();
+    if (!s) return NaN;
+    const neg = s.startsWith('-') || /^\(.*\)$/.test(s);
+    const x = parseFloat(s.replace(/[^0-9.]/g, ''));
+    return isNaN(x) ? NaN : (neg ? -x : x);
+}
+function detectDateOrder(values) {
+    let dmy = 0, mdy = 0;
+    values.slice(0, 1000).forEach(v => {
+        const m = String(v ?? '').trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.]\d{2,4}/);
+        if (!m) return;
+        if (+m[1] > 12) dmy++; else if (+m[2] > 12) mdy++;
+    });
+    return dmy > mdy ? 'DMY' : 'MDY';
+}
+function parseDate(v, order) {
+    const s = String(v ?? '').trim();
+    if (!s) return NaN;
+    const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+    if (m) {
+        let y = +m[3]; if (y < 100) y += 2000;
+        const d = order === 'DMY' ? +m[1] : +m[2], mo = order === 'DMY' ? +m[2] : +m[1];
+        return (mo < 1 || mo > 12 || d < 1 || d > 31) ? NaN : Date.UTC(y, mo - 1, d);
+    }
+    if (/^\d{5}(\.\d+)?$/.test(s)) return Math.round((parseFloat(s) - 25569) * 86400000);   // Excel serial date
+    const t = Date.parse(s);
+    return isNaN(t) ? NaN : t;
+}
+
+// ---------- RFM scoring (1-5 quintiles within the uploaded data) ----------
 function quintileScores(values, higherIsBetter) {
     const n = values.length;
-    const idx = values.map((v, i) => i).sort((a, b) => values[a] - values[b]);
+    const idx = values.map((_, i) => i).sort((a, b) => values[a] - values[b]);
     const avgRank = new Array(n);
-    let i = 0;
-    while (i < n) {
+    for (let i = 0; i < n;) {
         let j = i;
         while (j + 1 < n && values[idx[j + 1]] === values[idx[i]]) j++;
-        const r = (i + j) / 2 + 0.5;               // average rank for ties
-        for (let k = i; k <= j; k++) avgRank[idx[k]] = r;
+        for (let k = i; k <= j; k++) avgRank[idx[k]] = (i + j) / 2 + 0.5;
         i = j + 1;
     }
     return avgRank.map(r => {
-        let s = Math.min(5, Math.max(1, Math.ceil((r / n) * 5)));
+        const s = Math.min(5, Math.max(1, Math.ceil((r / n) * 5)));
         return higherIsBetter ? s : 6 - s;
     });
 }
 
+function sampleRows(X, m) {
+    if (X.length <= m) return X;
+    const idx = X.map((_, i) => i);
+    for (let i = 0; i < m; i++) { const j = i + Math.floor(rnd() * (idx.length - i)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    return idx.slice(0, m).map(i => X[i]);
+}
+
 function runPreprocessingAndDiagnostics() {
     hideAlert();
+    CUR = (currencyInput.value.trim() || '$').slice(0, 4);
+    document.querySelectorAll('.cur').forEach(e => e.textContent = CUR);
+
     const idCol = mapId.value, dateCol = mapDate.value, orderCol = mapOrder.value, priceCol = mapPrice.value, qtyCol = mapQty.value;
+    const chosen = [idCol, dateCol, orderCol, priceCol, qtyCol].filter(c => c !== NONE);
+    if (new Set(chosen).size < chosen.length) { showAlert("⚠️ Each field needs a different column. Please check the column mapping."); return; }
 
-    if (new Set([idCol, dateCol, orderCol, priceCol, qtyCol]).size < 5) {
-        showAlert("⚠️ Please map 5 unique headers correctly.");
-        return;
-    }
+    const dateOrder = dateFormatSel.value === 'auto' ? detectDateOrder(rawDataset.map(r => r[dateCol])) : dateFormatSel.value;
+    const subtractReturns = returnsChk.checked;
 
-    const cleanRows = [];
-    for (const row of rawDataset) {
+    const clean = [];
+    rawDataset.forEach((row, i) => {
         const cId = String(row[idCol] ?? '').trim();
-        const dVal = new Date(row[dateCol]);
-        const oId = String(row[orderCol] ?? '').trim();
-        const price = parseFloat(row[priceCol]);
-        const qty = parseFloat(row[qtyCol]);
-        if (!cId || isNaN(dVal.getTime()) || !oId || isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) continue;
-        cleanRows.push({ CustomerID: cId, OrderDate: dVal.getTime(), OrderID: oId, SalesAmount: price * qty });
-    }
-    if (cleanRows.length === 0) {
-        showAlert("❌ No valid records remained after cleaning. Check the column mapping and date format (YYYY-MM-DD).");
+        const t = parseDate(row[dateCol], dateOrder);
+        const oId = orderCol === NONE ? `row-${i}` : String(row[orderCol] ?? '').trim();
+        const price = parseNum(row[priceCol]);
+        const qty = qtyCol === NONE ? 1 : parseNum(row[qtyCol]);
+        if (!cId || isNaN(t) || !oId || isNaN(price) || isNaN(qty) || price === 0 || qty === 0) return;
+        const amount = price * qty;
+        if (amount < 0 && !subtractReturns) return;
+        clean.push({ CustomerID: cId, day: Math.floor(t / 86400000), OrderID: oId, Amount: amount });
+    });
+    if (clean.length === 0) {
+        showAlert("❌ No valid records remained after cleaning. Check the column mapping, the date format setting, and that price/quantity columns contain numbers.");
         return;
     }
 
-    let maxTime = -Infinity;
-    cleanRows.forEach(r => { if (r.OrderDate > maxTime) maxTime = r.OrderDate; });
-    const refDate = maxTime + 86400000;
+    let maxDay = -Infinity;
+    clean.forEach(r => { if (r.day > maxDay) maxDay = r.day; });
+    const refDay = maxDay + 1;
 
-    const customerMap = {};
-    cleanRows.forEach(r => {
-        const c = customerMap[r.CustomerID] || (customerMap[r.CustomerID] = { CustomerID: r.CustomerID, maxDate: r.OrderDate, orders: new Set(), sales: 0 });
-        if (r.OrderDate > c.maxDate) c.maxDate = r.OrderDate;
-        c.orders.add(r.OrderID);
-        c.sales += r.SalesAmount;
+    const map = new Map();
+    clean.forEach(r => {
+        let c = map.get(r.CustomerID);
+        if (!c) { c = { CustomerID: r.CustomerID, last: -Infinity, orders: new Set(), sales: 0 }; map.set(r.CustomerID, c); }
+        c.sales += r.Amount;
+        if (r.Amount > 0) { c.orders.add(r.OrderID); if (r.day > c.last) c.last = r.day; }
     });
-
-    rfmBaseList = Object.values(customerMap).map(c => ({
-        CustomerID: c.CustomerID,
-        Recency: Math.round((refDate - c.maxDate) / 86400000),
-        Frequency: c.orders.size,
-        Monetary: c.sales
+    rfmBaseList = [...map.values()].filter(c => c.orders.size > 0 && c.sales > 0).map(c => ({
+        CustomerID: c.CustomerID, Recency: refDay - c.last, Frequency: c.orders.size, Monetary: c.sales
     }));
 
-    if (rfmBaseList.length < 10) {
-        showAlert("❌ At least 10 unique customers are needed for meaningful segmentation.");
-        return;
-    }
+    const n = rfmBaseList.length;
+    if (n < 10) { showAlert("❌ At least 10 customers with valid purchases are needed for meaningful segmentation."); return; }
 
-    // RFM scores (1-5). Recency: fewer days = higher score.
     const rS = quintileScores(rfmBaseList.map(r => r.Recency), false);
     const fS = quintileScores(rfmBaseList.map(r => r.Frequency), true);
     const mS = quintileScores(rfmBaseList.map(r => r.Monetary), true);
     rfmBaseList.forEach((r, i) => { r.R = rS[i]; r.F = fS[i]; r.M = mS[i]; r.RFMScore = rS[i] + fS[i] + mS[i]; });
 
-    // Cluster on log + z-scored raw R/F/M
     const featureMatrix = rfmBaseList.map(r => [Math.log1p(r.Recency), Math.log1p(r.Frequency), Math.log1p(r.Monetary)]);
-    const n = featureMatrix.length, means = [0, 0, 0], stds = [0, 0, 0];
+    const means = [0, 0, 0], stds = [0, 0, 0];
     for (let i = 0; i < 3; i++) {
         means[i] = featureMatrix.reduce((s, row) => s + row[i], 0) / n;
-        const variance = featureMatrix.reduce((s, row) => s + (row[i] - means[i]) ** 2, 0) / n;
-        stds[i] = Math.sqrt(variance) || 1e-8;
+        stds[i] = Math.sqrt(featureMatrix.reduce((s, row) => s + (row[i] - means[i]) ** 2, 0) / n) || 1e-8;
     }
     scaledFeatureMatrix = featureMatrix.map(row => row.map((v, j) => (v - means[j]) / stds[j]));
 
-    // Diagnostics for K = 1..8 (capped by number of customers)
-    const maxK = Math.min(8, n - 1);
+    // Cluster range depends on dataset size: roughly 5+ customers per cluster, never more than 10
+    const maxK = Math.max(2, Math.min(10, Math.floor(n / 5)));
+
+    // Diagnostics on a sample (max 3000 customers) so big files stay fast
+    seed(7);
+    const diagX = sampleRows(scaledFeatureMatrix, 3000);
     const elbowData = [], silhouetteData = [];
     for (let k = 1; k <= maxK; k++) {
-        const res = runKMeansRobust(scaledFeatureMatrix, k, 10);
-        elbowData.push({ k, wcss: res.wcss });
-        if (k >= 2) silhouetteData.push({ k, score: calculateSilhouetteScore(scaledFeatureMatrix, res.assignments) });
+        seed(100 + k);
+        const res = runKMeansRobust(diagX, k, 8);
+        elbowData.push({ k, wcss: res.wcss * (n / diagX.length) });
+        if (k >= 2) silhouetteData.push({ k, score: calculateSilhouetteScore(diagX, res.assignments) });
     }
 
-    // Recommend K in 3..6 (matches the slider range and is useful for marketing)
-    let recommendedK = 3, bestSil = -Infinity;
-    silhouetteData.forEach(d => { if (d.k >= 3 && d.k <= 6 && d.score > bestSil) { bestSil = d.score; recommendedK = d.k; } });
+    // Recommend the K with the best silhouette, preferring at least 3 groups for business use
+    const minRec = Math.min(3, maxK);
+    let recommendedK = minRec, bestSil = -Infinity;
+    silhouetteData.forEach(d => { if (d.k >= minRec && d.score > bestSil) { bestSil = d.score; recommendedK = d.k; } });
     const k2 = silhouetteData.find(d => d.k === 2);
+    const k2Note = (k2 && recommendedK > 2 && k2.score > bestSil)
+        ? `* Note: K=2 scores ${k2.score.toFixed(3)} on raw separation, but ` : '* ';
 
     $('recommendationBanner').innerHTML = `
         <strong>💡 Smart Recommendation:</strong> Recommended <strong>K = ${recommendedK}</strong> (Silhouette Quality: <strong>${bestSil.toFixed(3)}</strong>).<br>
         <span class="text-xs font-normal text-blue-800">
-            ${k2 ? `* Note: K=2 scores ${k2.score.toFixed(3)} on raw separation, but ` : '* '}<strong>K=${recommendedK}</strong> is recommended because it gives distinct, actionable groups without over-segmentation.
+            ${k2Note}<strong>K=${recommendedK}</strong> is recommended because it gives distinct, actionable groups without over-segmentation.
+            Each customer group gets its own business name, and no name is used twice.
+            Based on your ${n.toLocaleString()} customers, you can choose between 2 and ${maxK} groups.
         </span>`;
 
-    sliderK.value = recommendedK;
+    sliderK.min = 2; sliderK.max = maxK; sliderK.value = recommendedK;
     kValDisplay.textContent = recommendedK;
+    kRangeHint.textContent = `(choose 2–${maxK} for this dataset)`;
 
     Plotly.newPlot('plotElbow', [{
         x: elbowData.map(d => d.k), y: elbowData.map(d => d.wcss),
@@ -513,7 +485,8 @@ function runPreprocessingAndDiagnostics() {
     fitSelectedClusterModel();
 }
 
-// ---------- Business segments: a fixed set, each used at most once ----------
+// ---------- Business segments: 10 profiles, each used at most once ----------
+// proto = typical average [R, F, M] scores (1-5) for that kind of customer
 const SEGMENTS = [
     { label: 'Champions', icon: '🏆', color: '#16a34a', proto: [4.7, 4.7, 4.7],
       who: 'Buy often, spend the most, and bought recently. Your best customers.',
@@ -521,12 +494,21 @@ const SEGMENTS = [
     { label: 'Loyal Customers', icon: '💙', color: '#2563eb', proto: [3.6, 4.3, 4.3],
       who: 'Order regularly and spend well, but not quite as recently as Champions.',
       actions: ['Offer loyalty points or bundle deals', 'Ask for reviews', 'Suggest premium products'] },
+    { label: 'Big Spenders', icon: '💎', color: '#0891b2', proto: [4.0, 2.5, 4.6],
+      who: 'Recent customers who spend a lot per order but do not order often.',
+      actions: ['Offer premium or bulk deals', 'Encourage a subscription or repeat order', 'Give personal service'] },
+    { label: 'Frequent Small Buyers', icon: '🛒', color: '#65a30d', proto: [4.0, 4.6, 2.5],
+      who: 'Order often and recently, but with small basket sizes.',
+      actions: ['Offer bundles to raise order value', 'Set a free-delivery minimum', 'Suggest add-on items'] },
     { label: 'New / Promising', icon: '🌱', color: '#0d9488', proto: [4.6, 1.8, 2.2],
       who: 'Bought recently but only a few times so far. Could become loyal.',
       actions: ['Send a welcome message', 'Offer a small discount on the next order', 'Recommend related products'] },
     { label: 'Needs Attention', icon: '👀', color: '#ca8a04', proto: [3, 3, 3],
       who: 'Average customers who are starting to slow down.',
       actions: ['Run a limited-time offer', 'Recommend items based on past orders', 'Reward a repeat purchase'] },
+    { label: 'About to Sleep', icon: '⏳', color: '#d97706', proto: [2.6, 2.4, 2.4],
+      who: 'Below-average activity and getting quieter. Easy to lose soon.',
+      actions: ['Send a friendly reminder', 'Share what is new', 'Offer a small incentive to return'] },
     { label: 'At Risk', icon: '🚨', color: '#ea580c', proto: [1.8, 4.0, 4.0],
       who: 'Used to spend a lot but have not bought for a long time. Worth winning back.',
       actions: ['Call or message them personally', 'Send an exclusive comeback offer', 'Ask what went wrong'] },
@@ -538,28 +520,38 @@ const SEGMENTS = [
       actions: ['Try one low-cost final win-back message', 'Send a short "why did you leave?" survey', 'Stop paid marketing if no reply'] }
 ];
 
-// Picks the best-fitting DIFFERENT business segment for every cluster (no duplicates)
+// Gives every cluster a DIFFERENT business segment, choosing the best overall fit
 function assignSegments(clusters) {
-    let best = { cost: Infinity, pick: null };
-    const used = new Array(SEGMENTS.length).fill(false), cur = [];
+    const m = clusters.length, S = SEGMENTS.length;
+    const D = clusters.map(c => SEGMENTS.map(s => Math.hypot(c.R - s.proto[0], c.F - s.proto[1], c.M - s.proto[2])));
+    const usedG = new Array(S).fill(false), pg = [];
+    let cg = 0;
+    for (let i = 0; i < m; i++) {                       // quick greedy answer as a starting upper bound
+        let bj = -1;
+        for (let j = 0; j < S; j++) if (!usedG[j] && (bj < 0 || D[i][j] < D[i][bj])) bj = j;
+        usedG[bj] = true; pg[i] = bj; cg += D[i][bj];
+    }
+    let best = { cost: cg, pick: pg }, nodes = 0;
+    const used = new Array(S).fill(false), cur = [];
     (function rec(i, cost) {
-        if (cost >= best.cost) return;
-        if (i === clusters.length) { best = { cost, pick: [...cur] }; return; }
-        const c = clusters[i];
-        SEGMENTS.forEach((seg, si) => {
-            if (used[si]) return;
-            const d = Math.hypot(c.R - seg.proto[0], c.F - seg.proto[1], c.M - seg.proto[2]);
-            used[si] = true; cur[i] = si;
-            rec(i + 1, cost + d);
-            used[si] = false;
-        });
+        if (cost >= best.cost || ++nodes > 300000) return;
+        if (i === m) { best = { cost, pick: [...cur] }; return; }
+        const order = [...Array(S).keys()].sort((a, b) => D[i][a] - D[i][b]);
+        for (const j of order) {
+            if (used[j]) continue;
+            used[j] = true; cur[i] = j;
+            rec(i + 1, cost + D[i][j]);
+            used[j] = false;
+        }
     })(0, 0);
-    return best.pick.map(i => SEGMENTS[i]);
+    return best.pick.map(j => SEGMENTS[j]);
 }
 
 function fitSelectedClusterModel() {
-    const kSelected = Math.min(parseInt(sliderK.value), rfmBaseList.length - 1, SEGMENTS.length);
-    const model = runKMeansRobust(scaledFeatureMatrix, kSelected, 20);
+    const n = rfmBaseList.length;
+    const kSelected = Math.min(parseInt(sliderK.value), n - 1, SEGMENTS.length);
+    seed(2024);
+    const model = runKMeansRobust(scaledFeatureMatrix, kSelected, n > 20000 ? 4 : 15);
     const rfmResult = rfmBaseList.map((r, i) => ({ ...r, Cluster: model.assignments[i] }));
 
     const prof = Array.from({ length: kSelected }, (_, c) => ({ cluster: c, n: 0, R: 0, F: 0, M: 0, rec: 0, freq: 0, mon: 0 }));
@@ -572,7 +564,7 @@ function fitSelectedClusterModel() {
 
     const defs = assignSegments(active);
     active.forEach((p, i) => { p.def = defs[i]; p.name = defs[i].label; p.color = defs[i].color; });
-    active.sort((a, b) => SEGMENTS.indexOf(a.def) - SEGMENTS.indexOf(b.def));   // best -> worst
+    active.sort((a, b) => SEGMENTS.indexOf(a.def) - SEGMENTS.indexOf(b.def));
 
     const byCluster = {};
     active.forEach(p => byCluster[p.cluster] = p);
@@ -582,7 +574,7 @@ function fitSelectedClusterModel() {
     renderResultsView(rfmResult, active);
 }
 
-// ---------- K-means with k-means++ initialisation ----------
+// ---------- K-means (k-means++ start, seeded) ----------
 function runKMeansRobust(X, k, nInit = 10) {
     let best = null;
     for (let i = 0; i < nInit; i++) {
@@ -591,11 +583,8 @@ function runKMeansRobust(X, k, nInit = 10) {
     }
     return best;
 }
-
 function kmeansPlusPlus(X, k) {
-    const n = X.length;
-    const centroids = [[...X[Math.floor(Math.random() * n)]]];
-    const d2 = new Array(n).fill(Infinity);
+    const n = X.length, centroids = [[...X[Math.floor(rnd() * n)]]], d2 = new Array(n).fill(Infinity);
     while (centroids.length < k) {
         const last = centroids[centroids.length - 1];
         let total = 0;
@@ -605,19 +594,17 @@ function kmeansPlusPlus(X, k) {
             if (d < d2[i]) d2[i] = d;
             total += d2[i];
         }
-        let r = Math.random() * total, pick = n - 1;
+        let r = rnd() * total, pick = n - 1;
         for (let i = 0; i < n; i++) { r -= d2[i]; if (r <= 0) { pick = i; break; } }
         centroids.push([...X[pick]]);
     }
     return centroids;
 }
-
 function runKMeansSingle(X, k, maxIter = 100) {
     const n = X.length, nf = X[0].length;
     let centroids = kmeansPlusPlus(X, k);
     const assignments = new Array(n).fill(-1);
     let wcss = 0;
-
     for (let iter = 0; iter < maxIter; iter++) {
         let changed = false;
         wcss = 0;
@@ -632,50 +619,43 @@ function runKMeansSingle(X, k, maxIter = 100) {
             if (assignments[i] !== best) { assignments[i] = best; changed = true; }
         }
         if (!changed) break;
-
-        const next = Array.from({ length: k }, () => new Array(nf).fill(0));
-        const counts = new Array(k).fill(0);
-        for (let i = 0; i < n; i++) {
-            counts[assignments[i]]++;
-            for (let j = 0; j < nf; j++) next[assignments[i]][j] += X[i][j];
-        }
+        const next = Array.from({ length: k }, () => new Array(nf).fill(0)), counts = new Array(k).fill(0);
+        for (let i = 0; i < n; i++) { counts[assignments[i]]++; for (let j = 0; j < nf; j++) next[assignments[i]][j] += X[i][j]; }
         for (let c = 0; c < k; c++) {
             if (counts[c] > 0) for (let j = 0; j < nf; j++) next[c][j] /= counts[c];
-            else next[c] = [...X[Math.floor(Math.random() * n)]];
+            else next[c] = [...X[Math.floor(rnd() * n)]];
         }
         centroids = next;
     }
     return { centroids, assignments, wcss };
 }
 
-// Silhouette on a random sample (max 800 points) so large files don't freeze the browser
 function calculateSilhouetteScore(Xfull, assignFull) {
-    let X = Xfull, assignments = assignFull;
-    if (Xfull.length > 800) {
-        const ids = Xfull.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, 800);
-        X = ids.map(i => Xfull[i]);
-        assignments = ids.map(i => assignFull[i]);
+    let ids = Xfull.map((_, i) => i);
+    if (ids.length > 800) {
+        for (let i = 0; i < 800; i++) { const j = i + Math.floor(rnd() * (ids.length - i)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+        ids = ids.slice(0, 800);
     }
-    const n = X.length;
+    const X = ids.map(i => Xfull[i]), A = ids.map(i => assignFull[i]), n = X.length;
     if (n < 2) return 0;
     let total = 0;
     for (let i = 0; i < n; i++) {
-        let a = 0, ownCount = 0;
+        let a = 0, own = 0;
         const other = {};
         for (let j = 0; j < n; j++) {
             if (i === j) continue;
             let d = 0;
             for (let f = 0; f < 3; f++) d += (X[i][f] - X[j][f]) ** 2;
             d = Math.sqrt(d);
-            if (assignments[j] === assignments[i]) { a += d; ownCount++; }
-            else { const o = other[assignments[j]] || (other[assignments[j]] = { s: 0, c: 0 }); o.s += d; o.c++; }
+            if (A[j] === A[i]) { a += d; own++; }
+            else { const o = other[A[j]] || (other[A[j]] = { s: 0, c: 0 }); o.s += d; o.c++; }
         }
-        if (ownCount === 0) continue;               // singleton cluster -> silhouette 0
-        a /= ownCount;
+        if (own === 0) continue;
+        a /= own;
         let b = Infinity;
         Object.values(other).forEach(o => { b = Math.min(b, o.s / o.c); });
         if (b === Infinity) continue;
-        total += (b - a) / Math.max(a, b || 1e-9);
+        total += (b - a) / (Math.max(a, b) || 1e-9);
     }
     return total / n;
 }
@@ -686,7 +666,7 @@ function renderResultsView(rfmList, segs) {
     $('metricTotalCust').textContent = total.toLocaleString();
     $('metricAvgRecency').textContent = avg('Recency').toFixed(1);
     $('metricAvgFreq').textContent = avg('Frequency').toFixed(1);
-    $('metricAvgSpend').textContent = `$${avg('Monetary').toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    $('metricAvgSpend').textContent = `${CUR}${avg('Monetary').toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
     Plotly.newPlot('plotPie', [{
         labels: segs.map(s => `${s.def.icon} ${s.name}`), values: segs.map(s => s.n),
@@ -699,17 +679,15 @@ function renderResultsView(rfmList, segs) {
             x: sub.map(r => r.Frequency), y: sub.map(r => r.Monetary),
             text: sub.map(r => `Customer: ${r.CustomerID}<br>Last purchase: ${r.Recency} days ago`),
             mode: 'markers', name: s.name,
-            marker: { color: s.color, size: sub.map(r => 6 + r.R * 2) }   // bigger dot = bought more recently
+            marker: { color: s.color, size: sub.map(r => 6 + r.R * 2) }
         };
     });
     Plotly.newPlot('plotScatter', traces, {
         xaxis: { title: 'Number of Orders', type: 'log' },
-        yaxis: { title: 'Total Spend ($)', type: 'log' },
+        yaxis: { title: `Total Spend (${CUR})`, type: 'log' },
         margin: { t: 10, b: 40, l: 50, r: 10 }
     }, { responsive: true });
 
-    // One clear card per segment: who they are, how big, what to do
-    const old = $('profileCard'); if (old) old.remove();
     const box = $('smeStrategyContainer');
     box.innerHTML = '';
     segs.forEach(s => {
@@ -722,7 +700,7 @@ function renderResultsView(rfmList, segs) {
                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:${s.color}22;color:${s.color}">${s.n} customers · ${(s.n / total * 100).toFixed(0)}%</span>
             </div>
             <p class="text-xs text-gray-600"><strong>Who they are:</strong> ${s.def.who}</p>
-            <p class="text-xs text-gray-500">Typically: last bought <strong>${Math.round(s.rec)} days ago</strong> · <strong>${s.freq.toFixed(1)}</strong> orders · <strong>$${s.mon.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong> total spend</p>
+            <p class="text-xs text-gray-500">Typically: last bought <strong>${Math.round(s.rec)} days ago</strong> · <strong>${s.freq.toFixed(1)}</strong> orders · <strong>${CUR}${s.mon.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong> total spend</p>
             <div class="text-xs"><strong class="text-slate-800">What to do:</strong>
                 <ul class="space-y-1 text-gray-600 list-disc list-inside mt-1">${s.def.actions.map(a => `<li>${a}</li>`).join('')}</ul>
             </div>`;
@@ -734,15 +712,14 @@ function renderResultsView(rfmList, segs) {
     const tbody = $('tableBody');
     tbody.innerHTML = '';
     sorted.slice(0, 100).forEach(r => {
-        const tr = document.createElement('tr');
+        const c = segs[order[r.Segment]].color, tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="p-2.5 font-medium text-gray-800">${esc(r.CustomerID)}</td>
-            <td class="p-2.5"><span class="font-semibold px-2 py-0.5 rounded-full border" style="background:${segs[order[r.Segment]].color}22;color:${segs[order[r.Segment]].color};border-color:${segs[order[r.Segment]].color}66">${esc(r.Segment)}</span></td>
+            <td class="p-2.5"><span class="font-semibold px-2 py-0.5 rounded-full border" style="background:${c}22;color:${c};border-color:${c}66">${esc(r.Segment)}</span></td>
             <td class="p-2.5">${r.Recency}</td><td class="p-2.5">${r.Frequency}</td>
-            <td class="p-2.5 font-medium">$${r.Monetary.toFixed(2)}</td>`;
+            <td class="p-2.5 font-medium">${CUR}${r.Monetary.toFixed(2)}</td>`;
         tbody.appendChild(tr);
     });
-
     secResults.classList.remove('hidden');
     secResults.classList.add('flex');
 }
@@ -751,7 +728,7 @@ function downloadCSV() {
     if (!finalProcessedResults) return;
     const rows = [["CustomerID", "Customer Segment", "Recency", "Frequency", "Monetary", "R Score", "F Score", "M Score", "RFM Score"].join(",")];
     finalProcessedResults.forEach(r => rows.push([
-        `"${r.CustomerID}"`, `"${r.Segment}"`, r.Recency, r.Frequency, r.Monetary.toFixed(2), r.R, r.F, r.M, r.RFMScore
+        `"${String(r.CustomerID).replace(/"/g, '""')}"`, `"${r.Segment}"`, r.Recency, r.Frequency, r.Monetary.toFixed(2), r.R, r.F, r.M, r.RFMScore
     ].join(",")));
     const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" }));
     const a = document.createElement("a");
