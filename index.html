@@ -53,20 +53,23 @@
         <main class="lg:col-span-3 flex flex-col gap-6">
 
             <!-- Data Health Guidelines -->
-            <details class="bg-white border border-blue-100 rounded-xl p-4 shadow-sm group">
-                <summary class="font-semibold text-blue-900 cursor-pointer flex justify-between items-center text-sm">
-                    <span>Please read this before uploading data</span>
-                    <span class="group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <div class="text-xs text-gray-600 mt-3 space-y-2 border-t pt-3 border-blue-50">
-                    <ul class="list-disc list-inside space-y-1">
-                        <li><strong>Missing Data:</strong> Automatically drops incomplete invoice rows.</li>
-                        <li><strong>Log1p Variance Stabilization:</strong> Reduces right-skewness in transaction spend.</li>
-                        <li><strong>Z-Score Standardization:</strong> Equalizes feature variance across Recency, Frequency, and Monetary values.</li>
-                        <li><strong>Multi-Metric Optimization:</strong> Evaluates Silhouette Scores and Elbow Method to recommend actionable business clusters.</li>
-                    </ul>
-                </div>
-            </details>
+<details class="bg-white border border-blue-100 rounded-xl p-4 shadow-sm group">
+    <summary class="font-semibold text-blue-900 cursor-pointer flex justify-between items-center text-sm">
+        <span>Please read this before uploading data</span>
+        <span class="group-open:rotate-180 transition-transform">▼</span>
+    </summary>
+    <div class="text-xs text-gray-600 mt-3 space-y-2 border-t pt-3 border-blue-50">
+        <ul class="list-disc list-inside space-y-1">
+            <li><strong>Required CSV Columns:</strong> Your file must have a header row with these 5 columns: <em>Customer ID, Order Date, Order ID, Unit Price, Quantity</em>. Each row should represent one purchased item or order line.</li>
+            <li><strong>Check the Column Mapping:</strong> After uploading, a "Map CSV Header Columns Correctly" section appears. Make sure each field points to the correct column in your file (e.g., <em>Order Date</em> → your date column, <em>Order ID</em> → your invoice/order number). Each of the 5 fields needs a <strong>different</strong> column. If two fields share the same column, the analysis will not run.</li>
+            <li><strong>Date Format:</strong> Use a standard format such as <code class="bg-blue-50 px-1 rounded">YYYY-MM-DD</code>. Rows with unreadable dates are dropped.</li>
+            <li><strong>Missing Data:</strong> Automatically drops incomplete invoice rows, including rows with a price or quantity of zero or below.</li>
+            <li><strong>Log1p Variance Stabilization:</strong> Reduces right-skewness in transaction spend.</li>
+            <li><strong>Z-Score Standardization:</strong> Equalizes feature variance across Recency, Frequency, and Monetary values.</li>
+            <li><strong>Multi-Metric Optimization:</strong> Evaluates Silhouette Scores and Elbow Method to recommend actionable business clusters.</li>
+        </ul>
+    </div>
+</details>
 
             <!-- NEW SECTION: HOW RFM CALCULATIONS ARE DONE -->
             <details class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm group" open>
