@@ -491,8 +491,8 @@ function runPreprocessingAndDiagnostics() {
     $('recommendationBanner').innerHTML = `
         <strong>💡 Smart Recommendation:</strong> Recommended <strong>K = ${recommendedK}</strong> (Silhouette Quality: <strong>${bestSil.toFixed(3)}</strong>).<br>
         <span class="text-xs font-normal text-blue-800">
-            ${k2 ? `* Note: K=2 scores ${k2.score.toFixed(3)} on raw separation, but ` : '* '}<strong>K=${recommendedK}</strong> is recommended because it gives multi-tier, actionable marketing groups without over-segmentation.
-            Segments are named from each cluster's average R, F and M scores (1–5).
+            ${k2 ? `* Note: K=2 scores ${k2.score.toFixed(3)} on raw separation, but ` : '* '}<strong>K=${recommendedK}</strong> is recommended because it gives distinct, actionable groups without over-segmentation.
+            Each customer group gets its own business name, and no name is used twice.
         </span>`;
 
     sliderK.value = recommendedK;
@@ -513,45 +513,67 @@ function runPreprocessingAndDiagnostics() {
     fitSelectedClusterModel();
 }
 
-// ---------- Segment naming from cluster-average RFM scores ----------
-function labelFromScores(r, f, m) {
-    const fm = (f + m) / 2;
-    if (r >= 3.5 && fm >= 3.5) return 'Champions';
-    if (fm >= 3.5 && r >= 2.5) return 'Loyal Customers';
-    if (fm >= 3 && r < 2.5) return 'At Risk (Former Big Spenders)';
-    if (r >= 3.5) return 'New / Promising';
-    if (r < 2 && fm < 2.5) return 'Lost / Lapsed';
-    if (r < 2.5) return 'Hibernating';
-    return 'Needs Attention';
+// ---------- Business segments: a fixed set, each used at most once ----------
+const SEGMENTS = [
+    { label: 'Champions', icon: '🏆', color: '#16a34a', proto: [4.7, 4.7, 4.7],
+      who: 'Buy often, spend the most, and bought recently. Your best customers.',
+      actions: ['Give early access to new products', 'Reward referrals and reviews', 'Send a personal thank-you'] },
+    { label: 'Loyal Customers', icon: '💙', color: '#2563eb', proto: [3.6, 4.3, 4.3],
+      who: 'Order regularly and spend well, but not quite as recently as Champions.',
+      actions: ['Offer loyalty points or bundle deals', 'Ask for reviews', 'Suggest premium products'] },
+    { label: 'New / Promising', icon: '🌱', color: '#0d9488', proto: [4.6, 1.8, 2.2],
+      who: 'Bought recently but only a few times so far. Could become loyal.',
+      actions: ['Send a welcome message', 'Offer a small discount on the next order', 'Recommend related products'] },
+    { label: 'Needs Attention', icon: '👀', color: '#ca8a04', proto: [3, 3, 3],
+      who: 'Average customers who are starting to slow down.',
+      actions: ['Run a limited-time offer', 'Recommend items based on past orders', 'Reward a repeat purchase'] },
+    { label: 'At Risk', icon: '🚨', color: '#ea580c', proto: [1.8, 4.0, 4.0],
+      who: 'Used to spend a lot but have not bought for a long time. Worth winning back.',
+      actions: ['Call or message them personally', 'Send an exclusive comeback offer', 'Ask what went wrong'] },
+    { label: 'Hibernating', icon: '😴', color: '#7c3aed', proto: [1.8, 2.2, 2.2],
+      who: 'Spent little, ordered a few times, and have been quiet for a while.',
+      actions: ['Send a reactivation promo', 'Remind them with seasonal campaigns', 'Run a short win-back email series'] },
+    { label: 'Lost / Lapsed', icon: '👋', color: '#6b7280', proto: [1.1, 1.2, 1.2],
+      who: 'Gone for a long time, bought rarely, and spent very little.',
+      actions: ['Try one low-cost final win-back message', 'Send a short "why did you leave?" survey', 'Stop paid marketing if no reply'] }
+];
+
+// Picks the best-fitting DIFFERENT business segment for every cluster (no duplicates)
+function assignSegments(clusters) {
+    let best = { cost: Infinity, pick: null };
+    const used = new Array(SEGMENTS.length).fill(false), cur = [];
+    (function rec(i, cost) {
+        if (cost >= best.cost) return;
+        if (i === clusters.length) { best = { cost, pick: [...cur] }; return; }
+        const c = clusters[i];
+        SEGMENTS.forEach((seg, si) => {
+            if (used[si]) return;
+            const d = Math.hypot(c.R - seg.proto[0], c.F - seg.proto[1], c.M - seg.proto[2]);
+            used[si] = true; cur[i] = si;
+            rec(i + 1, cost + d);
+            used[si] = false;
+        });
+    })(0, 0);
+    return best.pick.map(i => SEGMENTS[i]);
 }
 
 function fitSelectedClusterModel() {
-    const kSelected = Math.min(parseInt(sliderK.value), rfmBaseList.length - 1);
+    const kSelected = Math.min(parseInt(sliderK.value), rfmBaseList.length - 1, SEGMENTS.length);
     const model = runKMeansRobust(scaledFeatureMatrix, kSelected, 20);
     const rfmResult = rfmBaseList.map((r, i) => ({ ...r, Cluster: model.assignments[i] }));
 
-    // Per-cluster profile
     const prof = Array.from({ length: kSelected }, (_, c) => ({ cluster: c, n: 0, R: 0, F: 0, M: 0, rec: 0, freq: 0, mon: 0 }));
     rfmResult.forEach(r => {
         const p = prof[r.Cluster];
         p.n++; p.R += r.R; p.F += r.F; p.M += r.M; p.rec += r.Recency; p.freq += r.Frequency; p.mon += r.Monetary;
     });
     const active = prof.filter(p => p.n > 0);
-    active.forEach(p => {
-        ['R', 'F', 'M', 'rec', 'freq', 'mon'].forEach(k => p[k] /= p.n);
-        p.composite = p.R + p.F + p.M;
-        p.base = labelFromScores(p.R, p.F, p.M);
-    });
-    active.sort((a, b) => b.composite - a.composite);
+    active.forEach(p => ['R', 'F', 'M', 'rec', 'freq', 'mon'].forEach(k => p[k] /= p.n));
 
-    // Make names unique if two clusters land in the same category
-    const baseCount = {}, seen = {};
-    active.forEach(p => baseCount[p.base] = (baseCount[p.base] || 0) + 1);
-    active.forEach((p, i) => {
-        seen[p.base] = (seen[p.base] || 0) + 1;
-        p.name = baseCount[p.base] > 1 ? `${p.base} (${seen[p.base]})` : p.base;
-        p.color = PALETTE[i % PALETTE.length];
-    });
+    const defs = assignSegments(active);
+    active.forEach((p, i) => { p.def = defs[i]; p.name = defs[i].label; p.color = defs[i].color; });
+    active.sort((a, b) => SEGMENTS.indexOf(a.def) - SEGMENTS.indexOf(b.def));   // best -> worst
+
     const byCluster = {};
     active.forEach(p => byCluster[p.cluster] = p);
     rfmResult.forEach(r => { r.Segment = byCluster[r.Cluster].name; });
@@ -658,19 +680,6 @@ function calculateSilhouetteScore(Xfull, assignFull) {
     return total / n;
 }
 
-function strategyFor(base) {
-    const S = {
-        'Champions': ['VIP early access to new products', 'Referral and review rewards', 'Personal thank-you messages'],
-        'Loyal Customers': ['Loyalty points or bundle offers', 'Ask for reviews and referrals', 'Upsell premium items'],
-        'At Risk (Former Big Spenders)': ['Personal "we miss you" outreach', 'Exclusive comeback offer', 'Short feedback survey'],
-        'New / Promising': ['Welcome series and onboarding emails', 'Second-purchase discount', 'Cross-sell related products'],
-        'Needs Attention': ['Limited-time offers', 'Product recommendations from past orders', 'Frequency incentives'],
-        'Hibernating': ['Reactivation promo', 'Seasonal reminders', 'Win-back email sequence'],
-        'Lost / Lapsed': ['Low-cost final win-back campaign', 'Feedback survey on why they left', 'Remove from paid campaigns if no response']
-    };
-    return `<ul class="text-xs space-y-1 text-gray-600 list-disc list-inside">${(S[base] || S['Needs Attention']).map(t => `<li>${t}</li>`).join('')}</ul>`;
-}
-
 function renderResultsView(rfmList, segs) {
     const total = rfmList.length;
     const avg = (key) => rfmList.reduce((a, r) => a + r[key], 0) / total;
@@ -680,57 +689,44 @@ function renderResultsView(rfmList, segs) {
     $('metricAvgSpend').textContent = `$${avg('Monetary').toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
     Plotly.newPlot('plotPie', [{
-        labels: segs.map(s => s.name), values: segs.map(s => s.n),
-        type: 'pie', hole: 0.4, marker: { colors: segs.map(s => s.color) }
+        labels: segs.map(s => `${s.def.icon} ${s.name}`), values: segs.map(s => s.n),
+        type: 'pie', hole: 0.4, sort: false, marker: { colors: segs.map(s => s.color) }
     }], { margin: { t: 10, b: 10, l: 10, r: 10 } }, { responsive: true });
 
     const traces = segs.map(s => {
         const sub = rfmList.filter(r => r.Segment === s.name);
         return {
             x: sub.map(r => r.Frequency), y: sub.map(r => r.Monetary),
-            text: sub.map(r => `Customer: ${r.CustomerID}<br>Recency: ${r.Recency} days<br>RFM: ${r.R}-${r.F}-${r.M}`),
+            text: sub.map(r => `Customer: ${r.CustomerID}<br>Last purchase: ${r.Recency} days ago`),
             mode: 'markers', name: s.name,
-            marker: { color: s.color, size: sub.map(r => 6 + r.R * 2) }   // bigger dot = more recent
+            marker: { color: s.color, size: sub.map(r => 6 + r.R * 2) }   // bigger dot = bought more recently
         };
     });
     Plotly.newPlot('plotScatter', traces, {
-        xaxis: { title: 'Frequency (Orders)', type: 'log' },
-        yaxis: { title: 'Monetary ($)', type: 'log' },
+        xaxis: { title: 'Number of Orders', type: 'log' },
+        yaxis: { title: 'Total Spend ($)', type: 'log' },
         margin: { t: 10, b: 40, l: 50, r: 10 }
     }, { responsive: true });
 
-    // Segment profile table (created once, placed above the action plans)
-    const stratContainer = $('smeStrategyContainer');
-    let profileCard = $('profileCard');
-    if (!profileCard) {
-        profileCard = document.createElement('div');
-        profileCard.id = 'profileCard';
-        profileCard.className = 'bg-white p-5 rounded-xl border shadow-sm';
-        const plansCard = stratContainer.parentElement;
-        plansCard.parentElement.insertBefore(profileCard, plansCard);
-    }
-    profileCard.innerHTML = `
-        <h4 class="text-md font-bold text-gray-800 mb-1">Segment Profiles (RFM Scores 1–5)</h4>
-        <p class="text-xs text-gray-500 mb-3">Scores are quintiles: 5 = best. Recency is inverted, so a high R score means a recent purchase.</p>
-        <div class="overflow-x-auto"><table class="w-full text-left text-xs border-collapse">
-            <thead class="bg-gray-100 border-b"><tr>
-                <th class="p-2.5">Segment</th><th class="p-2.5">Customers</th><th class="p-2.5">Avg R</th><th class="p-2.5">Avg F</th><th class="p-2.5">Avg M</th>
-                <th class="p-2.5">Avg Recency (days)</th><th class="p-2.5">Avg Orders</th><th class="p-2.5">Avg Spend ($)</th>
-            </tr></thead>
-            <tbody class="divide-y">${segs.map(s => `
-                <tr><td class="p-2.5 font-semibold"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${s.color};margin-right:6px"></span>${esc(s.name)}</td>
-                <td class="p-2.5">${s.n} (${(s.n / total * 100).toFixed(0)}%)</td>
-                <td class="p-2.5">${s.R.toFixed(1)}</td><td class="p-2.5">${s.F.toFixed(1)}</td><td class="p-2.5">${s.M.toFixed(1)}</td>
-                <td class="p-2.5">${s.rec.toFixed(0)}</td><td class="p-2.5">${s.freq.toFixed(1)}</td><td class="p-2.5">$${s.mon.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td></tr>`).join('')}
-            </tbody></table></div>`;
-
-    stratContainer.innerHTML = '';
+    // One clear card per segment: who they are, how big, what to do
+    const old = $('profileCard'); if (old) old.remove();
+    const box = $('smeStrategyContainer');
+    box.innerHTML = '';
     segs.forEach(s => {
         const card = document.createElement('div');
-        card.className = 'border rounded-xl p-3.5 bg-slate-50 border-slate-200';
-        card.style.borderLeft = `4px solid ${s.color}`;
-        card.innerHTML = `<h5 class="text-xs font-bold text-slate-800 mb-1">${esc(s.name)}</h5>${strategyFor(s.base)}`;
-        stratContainer.appendChild(card);
+        card.className = 'border rounded-xl p-4 bg-white shadow-sm flex flex-col gap-2';
+        card.style.borderTop = `5px solid ${s.color}`;
+        card.innerHTML = `
+            <div class="flex items-center justify-between">
+                <h5 class="text-sm font-bold text-slate-800">${s.def.icon} ${esc(s.name)}</h5>
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:${s.color}22;color:${s.color}">${s.n} customers · ${(s.n / total * 100).toFixed(0)}%</span>
+            </div>
+            <p class="text-xs text-gray-600"><strong>Who they are:</strong> ${s.def.who}</p>
+            <p class="text-xs text-gray-500">Typically: last bought <strong>${Math.round(s.rec)} days ago</strong> · <strong>${s.freq.toFixed(1)}</strong> orders · <strong>$${s.mon.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong> total spend</p>
+            <div class="text-xs"><strong class="text-slate-800">What to do:</strong>
+                <ul class="space-y-1 text-gray-600 list-disc list-inside mt-1">${s.def.actions.map(a => `<li>${a}</li>`).join('')}</ul>
+            </div>`;
+        box.appendChild(card);
     });
 
     const order = Object.fromEntries(segs.map((s, i) => [s.name, i]));
@@ -741,7 +737,7 @@ function renderResultsView(rfmList, segs) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="p-2.5 font-medium text-gray-800">${esc(r.CustomerID)}</td>
-            <td class="p-2.5"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200">${esc(r.Segment)}</span></td>
+            <td class="p-2.5"><span class="font-semibold px-2 py-0.5 rounded-full border" style="background:${segs[order[r.Segment]].color}22;color:${segs[order[r.Segment]].color};border-color:${segs[order[r.Segment]].color}66">${esc(r.Segment)}</span></td>
             <td class="p-2.5">${r.Recency}</td><td class="p-2.5">${r.Frequency}</td>
             <td class="p-2.5 font-medium">$${r.Monetary.toFixed(2)}</td>`;
         tbody.appendChild(tr);
