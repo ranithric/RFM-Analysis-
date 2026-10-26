@@ -478,14 +478,13 @@
             });
 
             // UI Recommendation Text
-            document.getElementById('recommendationBanner').innerHTML =
-                 </strong> Recommended <strong>K = ${recommendedK}</strong> (Silhouette Quality: <strong>${bestBusinessSil.toFixed(3)}</strong>).<br>
-                <span class="text-xs font-normal text-blue-800">
-                    * Note: While K=2 produces a higher raw boundary score (${silhouetteData.find(d => d.k===2).score.toFixed(3)}), 
-                    <strong>K=${recommendedK}</strong> is recommended because it provides multi-tier actionable marketing groups without over-segmentation.
-                </span>
-            `;
-
+            document.getElementById('recommendationBanner').innerHTML = `
+    <strong>💡 Smart Recommendation:</strong> Recommended <strong>K = ${recommendedK}</strong> (Silhouette Quality: <strong>${bestBusinessSil.toFixed(3)}</strong>).<br>
+    <span class="text-xs font-normal text-blue-800">
+        * Note: While K=2 produces a higher raw boundary score (${silhouetteData.find(d => d.k === 2).score.toFixed(3)}),
+        <strong>K=${recommendedK}</strong> is recommended because it provides multi-tier actionable marketing groups without over-segmentation.
+    </span>
+`;
             sliderK.value = recommendedK;
             kValDisplay.textContent = recommendedK;
 
