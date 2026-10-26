@@ -264,491 +264,505 @@
 
     <!-- SCRIPT LOGIC -->
     <script>
-        let rawDataset = null;
-        let rfmBaseList = null;
-        let scaledFeatureMatrix = null;
-        let finalProcessedResults = null;
+        let rawDataset = null, rfmBaseList = null, scaledFeatureMatrix = null, finalProcessedResults = null;
 
-        const csvFileInput = document.getElementById('csvFileInput');
-        const btnDemoData = document.getElementById('btnDemoData');
-        const btnRunPipeline = document.getElementById('btnRunPipeline');
-        const btnFitModel = document.getElementById('btnFitModel');
-        const sliderK = document.getElementById('sliderK');
-        const kValDisplay = document.getElementById('kValDisplay');
+const $ = (id) => document.getElementById(id);
+const csvFileInput = $('csvFileInput'), btnDemoData = $('btnDemoData'), btnRunPipeline = $('btnRunPipeline');
+const btnFitModel = $('btnFitModel'), sliderK = $('sliderK'), kValDisplay = $('kValDisplay');
+const secMapping = $('secMapping'), secDiagnostics = $('secDiagnostics'), secResults = $('secResults'), alertBox = $('alertBox');
+const mapId = $('mapId'), mapDate = $('mapDate'), mapOrder = $('mapOrder'), mapPrice = $('mapPrice'), mapQty = $('mapQty');
 
-        const secMapping = document.getElementById('secMapping');
-        const secDiagnostics = document.getElementById('secDiagnostics');
-        const secResults = document.getElementById('secResults');
-        const alertBox = document.getElementById('alertBox');
+const PALETTE = ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f'];
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-        const mapId = document.getElementById('mapId');
-        const mapDate = document.getElementById('mapDate');
-        const mapOrder = document.getElementById('mapOrder');
-        const mapPrice = document.getElementById('mapPrice');
-        const mapQty = document.getElementById('mapQty');
+sliderK.addEventListener('input', (e) => kValDisplay.textContent = e.target.value);
 
-        sliderK.addEventListener('input', (e) => kValDisplay.textContent = e.target.value);
+btnDemoData.addEventListener('click', () => {
+    rawDataset = generateSyntheticData(1500, 200);
+    populateMappingDropdowns();
+    btnRunPipeline.disabled = false;
+    hideAlert();
+});
 
-        btnDemoData.addEventListener('click', () => {
-            rawDataset = generateSyntheticData(1000, 150);
-            populateMappingDropdowns();
-            btnRunPipeline.disabled = false;
-            hideAlert();
+csvFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: (results) => {
+            if (results.data && results.data.length > 0) {
+                rawDataset = results.data;
+                populateMappingDropdowns();
+                btnRunPipeline.disabled = false;
+                hideAlert();
+            } else showAlert("❌ Could not parse valid CSV records.");
+        },
+        error: (err) => showAlert(`❌ CSV Parse Error: ${err.message}`)
+    });
+});
+
+btnRunPipeline.addEventListener('click', runPreprocessingAndDiagnostics);
+btnFitModel.addEventListener('click', fitSelectedClusterModel);
+$('btnDownload').addEventListener('click', downloadCSV);
+
+function showAlert(msg) {
+    alertBox.className = 'p-4 rounded-xl text-sm font-medium border bg-red-50 text-red-800 border-red-200 block';
+    alertBox.innerHTML = msg;
+}
+function hideAlert() { alertBox.className = 'hidden'; }
+
+// ---------- Smarter column auto-detection (no column is picked twice) ----------
+function populateMappingDropdowns() {
+    if (!rawDataset || rawDataset.length === 0) return;
+    const cols = Object.keys(rawDataset[0]);
+    const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Each field: patterns in priority order (first pattern = best match)
+    const fields = [
+        { el: mapId,    pats: ['customerid', 'custid', 'clientid', 'userid', 'customer', 'cust', 'client', 'user'] },
+        { el: mapDate,  pats: ['orderdate', 'invoicedate', 'purchasedate', 'transactiondate', 'date', 'time'] },
+        { el: mapOrder, pats: ['orderid', 'invoiceno', 'invoiceid', 'invoice', 'transactionid', 'txn', 'ordernumber', 'order'] },
+        { el: mapPrice, pats: ['unitprice', 'price', 'rate', 'cost'] },
+        { el: mapQty,   pats: ['quantity', 'qty', 'units', 'count'] }
+    ];
+
+    const used = new Set();
+    const choice = new Map();
+    fields.forEach(f => {
+        let pick = null;
+        for (const p of f.pats) {
+            pick = cols.find(c => !used.has(c) && norm(c) === p) || cols.find(c => !used.has(c) && norm(c).includes(p));
+            if (pick) break;
+        }
+        if (pick) used.add(pick);
+        choice.set(f.el, pick);
+    });
+    // Fallback for fields with no match: first unused column
+    fields.forEach(f => {
+        if (!choice.get(f.el)) {
+            const free = cols.find(c => !used.has(c)) || cols[0];
+            used.add(free);
+            choice.set(f.el, free);
+        }
+    });
+
+    fields.forEach(({ el }) => {
+        el.innerHTML = '';
+        cols.forEach(col => {
+            const opt = document.createElement('option');
+            opt.value = col; opt.textContent = col;
+            el.appendChild(opt);
         });
+        el.value = choice.get(el);
+    });
+    secMapping.classList.remove('hidden');
+}
 
-        csvFileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                complete: (results) => {
-                    if (results.data && results.data.length > 0) {
-                        rawDataset = results.data;
-                        populateMappingDropdowns();
-                        btnRunPipeline.disabled = false;
-                        hideAlert();
-                    } else {
-                        showAlert("❌ Could not parse valid CSV records.");
-                    }
-                },
-                error: (err) => showAlert(`❌ CSV Parse Error: ${err.message}`)
+function generateSyntheticData(numRows = 1500, numCust = 200) {
+    const custIds = Array.from({ length: numCust }, (_, i) => `CUST-${1000 + i}`);
+    const rows = [];
+    const baseTime = new Date('2026-06-30T00:00:00').getTime();
+    // Each customer gets a behaviour profile so the demo has real, discoverable segments
+    const profiles = custIds.map(() => {
+        const t = Math.random();
+        if (t < 0.15) return { w: 5, maxAgo: 60,  price: 3 };   // frequent, recent, high spend
+        if (t < 0.45) return { w: 3, maxAgo: 150, price: 2 };   // regular
+        if (t < 0.70) return { w: 1, maxAgo: 60,  price: 1.5 }; // new / occasional
+        return { w: 1, maxAgo: 365, price: 1 };                 // old, inactive
+    });
+    const weights = profiles.map(p => p.w), totalW = weights.reduce((a, b) => a + b, 0);
+    const pickCust = () => { let r = Math.random() * totalW; for (let i = 0; i < weights.length; i++) { r -= weights[i]; if (r <= 0) return i; } return 0; };
+    let invCounter = 50000;
+    const orderCount = Math.round(numRows / 3);
+    for (let o = 0; o < orderCount; o++) {
+        const ci = pickCust(), p = profiles[ci];
+        const daysAgo = Math.floor(Math.random() * p.maxAgo) + (p.maxAgo === 365 ? 120 : 0);
+        const orderDate = new Date(baseTime - Math.min(daysAgo, 364) * 86400000).toISOString().split('T')[0];
+        const invoice = `INV-${invCounter++}`;
+        const lines = 1 + Math.floor(Math.random() * 5);
+        for (let l = 0; l < lines; l++) {
+            rows.push({
+                CustomerID: custIds[ci], OrderDate: orderDate, OrderID: invoice,
+                UnitPrice: parseFloat(((Math.exp(Math.random() * 2) + 1.5) * p.price).toFixed(2)),
+                Quantity: Math.floor(Math.random() * 8) + 1
             });
-        });
-
-        btnRunPipeline.addEventListener('click', () => runPreprocessingAndDiagnostics());
-        btnFitModel.addEventListener('click', () => fitSelectedClusterModel());
-        document.getElementById('btnDownload').addEventListener('click', () => downloadCSV());
-
-        function showAlert(msg) {
-            alertBox.className = `p-4 rounded-xl text-sm font-medium border bg-red-50 text-red-800 border-red-200 block`;
-            alertBox.innerHTML = msg;
         }
+    }
+    return rows;
+}
 
-        function hideAlert() { alertBox.className = "hidden"; }
+// ---------- RFM scoring (1-5 quintiles, rank-based so ties are handled fairly) ----------
+function quintileScores(values, higherIsBetter) {
+    const n = values.length;
+    const idx = values.map((v, i) => i).sort((a, b) => values[a] - values[b]);
+    const avgRank = new Array(n);
+    let i = 0;
+    while (i < n) {
+        let j = i;
+        while (j + 1 < n && values[idx[j + 1]] === values[idx[i]]) j++;
+        const r = (i + j) / 2 + 0.5;               // average rank for ties
+        for (let k = i; k <= j; k++) avgRank[idx[k]] = r;
+        i = j + 1;
+    }
+    return avgRank.map(r => {
+        let s = Math.min(5, Math.max(1, Math.ceil((r / n) * 5)));
+        return higherIsBetter ? s : 6 - s;
+    });
+}
 
-        function findDefaultCol(candidates, columns) {
-            for (let col of columns) {
-                if (candidates.some(cand => col.toLowerCase().includes(cand))) return col;
-            }
-            return columns[0] || '';
+function runPreprocessingAndDiagnostics() {
+    hideAlert();
+    const idCol = mapId.value, dateCol = mapDate.value, orderCol = mapOrder.value, priceCol = mapPrice.value, qtyCol = mapQty.value;
+
+    if (new Set([idCol, dateCol, orderCol, priceCol, qtyCol]).size < 5) {
+        showAlert("⚠️ Please map 5 unique headers correctly.");
+        return;
+    }
+
+    const cleanRows = [];
+    for (const row of rawDataset) {
+        const cId = String(row[idCol] ?? '').trim();
+        const dVal = new Date(row[dateCol]);
+        const oId = String(row[orderCol] ?? '').trim();
+        const price = parseFloat(row[priceCol]);
+        const qty = parseFloat(row[qtyCol]);
+        if (!cId || isNaN(dVal.getTime()) || !oId || isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) continue;
+        cleanRows.push({ CustomerID: cId, OrderDate: dVal.getTime(), OrderID: oId, SalesAmount: price * qty });
+    }
+    if (cleanRows.length === 0) {
+        showAlert("❌ No valid records remained after cleaning. Check the column mapping and date format (YYYY-MM-DD).");
+        return;
+    }
+
+    let maxTime = -Infinity;
+    cleanRows.forEach(r => { if (r.OrderDate > maxTime) maxTime = r.OrderDate; });
+    const refDate = maxTime + 86400000;
+
+    const customerMap = {};
+    cleanRows.forEach(r => {
+        const c = customerMap[r.CustomerID] || (customerMap[r.CustomerID] = { CustomerID: r.CustomerID, maxDate: r.OrderDate, orders: new Set(), sales: 0 });
+        if (r.OrderDate > c.maxDate) c.maxDate = r.OrderDate;
+        c.orders.add(r.OrderID);
+        c.sales += r.SalesAmount;
+    });
+
+    rfmBaseList = Object.values(customerMap).map(c => ({
+        CustomerID: c.CustomerID,
+        Recency: Math.round((refDate - c.maxDate) / 86400000),
+        Frequency: c.orders.size,
+        Monetary: c.sales
+    }));
+
+    if (rfmBaseList.length < 10) {
+        showAlert("❌ At least 10 unique customers are needed for meaningful segmentation.");
+        return;
+    }
+
+    // RFM scores (1-5). Recency: fewer days = higher score.
+    const rS = quintileScores(rfmBaseList.map(r => r.Recency), false);
+    const fS = quintileScores(rfmBaseList.map(r => r.Frequency), true);
+    const mS = quintileScores(rfmBaseList.map(r => r.Monetary), true);
+    rfmBaseList.forEach((r, i) => { r.R = rS[i]; r.F = fS[i]; r.M = mS[i]; r.RFMScore = rS[i] + fS[i] + mS[i]; });
+
+    // Cluster on log + z-scored raw R/F/M
+    const featureMatrix = rfmBaseList.map(r => [Math.log1p(r.Recency), Math.log1p(r.Frequency), Math.log1p(r.Monetary)]);
+    const n = featureMatrix.length, means = [0, 0, 0], stds = [0, 0, 0];
+    for (let i = 0; i < 3; i++) {
+        means[i] = featureMatrix.reduce((s, row) => s + row[i], 0) / n;
+        const variance = featureMatrix.reduce((s, row) => s + (row[i] - means[i]) ** 2, 0) / n;
+        stds[i] = Math.sqrt(variance) || 1e-8;
+    }
+    scaledFeatureMatrix = featureMatrix.map(row => row.map((v, j) => (v - means[j]) / stds[j]));
+
+    // Diagnostics for K = 1..8 (capped by number of customers)
+    const maxK = Math.min(8, n - 1);
+    const elbowData = [], silhouetteData = [];
+    for (let k = 1; k <= maxK; k++) {
+        const res = runKMeansRobust(scaledFeatureMatrix, k, 10);
+        elbowData.push({ k, wcss: res.wcss });
+        if (k >= 2) silhouetteData.push({ k, score: calculateSilhouetteScore(scaledFeatureMatrix, res.assignments) });
+    }
+
+    // Recommend K in 3..6 (matches the slider range and is useful for marketing)
+    let recommendedK = 3, bestSil = -Infinity;
+    silhouetteData.forEach(d => { if (d.k >= 3 && d.k <= 6 && d.score > bestSil) { bestSil = d.score; recommendedK = d.k; } });
+    const k2 = silhouetteData.find(d => d.k === 2);
+
+    $('recommendationBanner').innerHTML = `
+        <strong>💡 Smart Recommendation:</strong> Recommended <strong>K = ${recommendedK}</strong> (Silhouette Quality: <strong>${bestSil.toFixed(3)}</strong>).<br>
+        <span class="text-xs font-normal text-blue-800">
+            ${k2 ? `* Note: K=2 scores ${k2.score.toFixed(3)} on raw separation, but ` : '* '}<strong>K=${recommendedK}</strong> is recommended because it gives multi-tier, actionable marketing groups without over-segmentation.
+            Segments are named from each cluster's average R, F and M scores (1–5).
+        </span>`;
+
+    sliderK.value = recommendedK;
+    kValDisplay.textContent = recommendedK;
+
+    Plotly.newPlot('plotElbow', [{
+        x: elbowData.map(d => d.k), y: elbowData.map(d => d.wcss),
+        type: 'scatter', mode: 'lines+markers', marker: { color: '#2563eb', size: 8 }
+    }], { xaxis: { title: 'Number of Clusters (K)', dtick: 1 }, yaxis: { title: 'WCSS' }, margin: { t: 10, b: 40, l: 50, r: 10 } }, { responsive: true });
+
+    Plotly.newPlot('plotSilhouette', [{
+        x: silhouetteData.map(d => d.k), y: silhouetteData.map(d => d.score),
+        type: 'bar', marker: { color: silhouetteData.map(d => d.k === recommendedK ? '#2563eb' : '#93c5fd') }
+    }], { xaxis: { title: 'Number of Clusters (K)', dtick: 1 }, yaxis: { title: 'Silhouette Score' }, margin: { t: 10, b: 40, l: 50, r: 10 } }, { responsive: true });
+
+    secDiagnostics.classList.remove('hidden');
+    secDiagnostics.classList.add('flex');
+    fitSelectedClusterModel();
+}
+
+// ---------- Segment naming from cluster-average RFM scores ----------
+function labelFromScores(r, f, m) {
+    const fm = (f + m) / 2;
+    if (r >= 3.5 && fm >= 3.5) return 'Champions';
+    if (fm >= 3.5 && r >= 2.5) return 'Loyal Customers';
+    if (fm >= 3 && r < 2.5) return 'At Risk (Former Big Spenders)';
+    if (r >= 3.5) return 'New / Promising';
+    if (r < 2 && fm < 2.5) return 'Lost / Lapsed';
+    if (r < 2.5) return 'Hibernating';
+    return 'Needs Attention';
+}
+
+function fitSelectedClusterModel() {
+    const kSelected = Math.min(parseInt(sliderK.value), rfmBaseList.length - 1);
+    const model = runKMeansRobust(scaledFeatureMatrix, kSelected, 20);
+    const rfmResult = rfmBaseList.map((r, i) => ({ ...r, Cluster: model.assignments[i] }));
+
+    // Per-cluster profile
+    const prof = Array.from({ length: kSelected }, (_, c) => ({ cluster: c, n: 0, R: 0, F: 0, M: 0, rec: 0, freq: 0, mon: 0 }));
+    rfmResult.forEach(r => {
+        const p = prof[r.Cluster];
+        p.n++; p.R += r.R; p.F += r.F; p.M += r.M; p.rec += r.Recency; p.freq += r.Frequency; p.mon += r.Monetary;
+    });
+    const active = prof.filter(p => p.n > 0);
+    active.forEach(p => {
+        ['R', 'F', 'M', 'rec', 'freq', 'mon'].forEach(k => p[k] /= p.n);
+        p.composite = p.R + p.F + p.M;
+        p.base = labelFromScores(p.R, p.F, p.M);
+    });
+    active.sort((a, b) => b.composite - a.composite);
+
+    // Make names unique if two clusters land in the same category
+    const baseCount = {}, seen = {};
+    active.forEach(p => baseCount[p.base] = (baseCount[p.base] || 0) + 1);
+    active.forEach((p, i) => {
+        seen[p.base] = (seen[p.base] || 0) + 1;
+        p.name = baseCount[p.base] > 1 ? `${p.base} (${seen[p.base]})` : p.base;
+        p.color = PALETTE[i % PALETTE.length];
+    });
+    const byCluster = {};
+    active.forEach(p => byCluster[p.cluster] = p);
+    rfmResult.forEach(r => { r.Segment = byCluster[r.Cluster].name; });
+
+    finalProcessedResults = rfmResult;
+    renderResultsView(rfmResult, active);
+}
+
+// ---------- K-means with k-means++ initialisation ----------
+function runKMeansRobust(X, k, nInit = 10) {
+    let best = null;
+    for (let i = 0; i < nInit; i++) {
+        const m = runKMeansSingle(X, k);
+        if (!best || m.wcss < best.wcss) best = m;
+    }
+    return best;
+}
+
+function kmeansPlusPlus(X, k) {
+    const n = X.length;
+    const centroids = [[...X[Math.floor(Math.random() * n)]]];
+    const d2 = new Array(n).fill(Infinity);
+    while (centroids.length < k) {
+        const last = centroids[centroids.length - 1];
+        let total = 0;
+        for (let i = 0; i < n; i++) {
+            let d = 0;
+            for (let j = 0; j < last.length; j++) d += (X[i][j] - last[j]) ** 2;
+            if (d < d2[i]) d2[i] = d;
+            total += d2[i];
         }
+        let r = Math.random() * total, pick = n - 1;
+        for (let i = 0; i < n; i++) { r -= d2[i]; if (r <= 0) { pick = i; break; } }
+        centroids.push([...X[pick]]);
+    }
+    return centroids;
+}
 
-        function populateMappingDropdowns() {
-            if (!rawDataset || rawDataset.length === 0) return;
-            const cols = Object.keys(rawDataset[0]);
+function runKMeansSingle(X, k, maxIter = 100) {
+    const n = X.length, nf = X[0].length;
+    let centroids = kmeansPlusPlus(X, k);
+    const assignments = new Array(n).fill(-1);
+    let wcss = 0;
 
-            const dropdowns = [
-                { el: mapId, cand: ["cust", "user", "client"] },
-                { el: mapDate, cand: ["date", "time", "day"] },
-                { el: mapOrder, cand: ["order", "txn", "invoice"] },
-                { el: mapPrice, cand: ["price", "rate", "cost"] },
-                { el: mapQty, cand: ["qty", "quantity", "count"] }
-            ];
-
-            dropdowns.forEach(({ el, cand }) => {
-                el.innerHTML = '';
-                cols.forEach(col => {
-                    const opt = document.createElement('option');
-                    opt.value = col;
-                    opt.textContent = col;
-                    el.appendChild(opt);
-                });
-                el.value = findDefaultCol(cand, cols);
-            });
-
-            secMapping.classList.remove('hidden');
+    for (let iter = 0; iter < maxIter; iter++) {
+        let changed = false;
+        wcss = 0;
+        for (let i = 0; i < n; i++) {
+            let minD = Infinity, best = 0;
+            for (let c = 0; c < k; c++) {
+                let d = 0;
+                for (let j = 0; j < nf; j++) d += (X[i][j] - centroids[c][j]) ** 2;
+                if (d < minD) { minD = d; best = c; }
+            }
+            wcss += minD;
+            if (assignments[i] !== best) { assignments[i] = best; changed = true; }
         }
+        if (!changed) break;
 
-        function generateSyntheticData(numRows = 1000, numCust = 150) {
-            const custIds = Array.from({ length: numCust }, (_, i) => `CUST-${1000 + i}`);
-            const orderIds = Array.from({ length: 300 }, (_, i) => `INV-${50000 + i}`);
-            const rows = [];
-            const baseTime = new Date('2026-06-30T00:00:00').getTime();
-
-            for (let i = 0; i < numRows; i++) {
-                const randomDays = Math.floor(Math.random() * 365);
-                const orderDate = new Date(baseTime - randomDays * 86400000).toISOString().split('T')[0];
-                const unitPrice = (Math.exp(Math.random() * 3) + 1.5).toFixed(2);
-                const qty = Math.floor(Math.random() * 11) + 1;
-
-                rows.push({
-                    CustomerID: custIds[Math.floor(Math.random() * custIds.length)],
-                    OrderDate: orderDate,
-                    OrderID: orderIds[Math.floor(Math.random() * orderIds.length)],
-                    UnitPrice: parseFloat(unitPrice),
-                    Quantity: qty
-                });
-            }
-            return rows;
+        const next = Array.from({ length: k }, () => new Array(nf).fill(0));
+        const counts = new Array(k).fill(0);
+        for (let i = 0; i < n; i++) {
+            counts[assignments[i]]++;
+            for (let j = 0; j < nf; j++) next[assignments[i]][j] += X[i][j];
         }
-
-        function runPreprocessingAndDiagnostics() {
-            hideAlert();
-
-            const idCol = mapId.value;
-            const dateCol = mapDate.value;
-            const orderCol = mapOrder.value;
-            const priceCol = mapPrice.value;
-            const qtyCol = mapQty.value;
-
-            if (new Set([idCol, dateCol, orderCol, priceCol, qtyCol]).size < 5) {
-                showAlert("⚠️ Please map 5 unique headers correctly.");
-                return;
-            }
-
-            // Clean & Aggregate
-            const cleanRows = [];
-            for (let row of rawDataset) {
-                const cId = String(row[idCol] || '').trim();
-                const dVal = new Date(row[dateCol]);
-                const oId = String(row[orderCol] || '').trim();
-                const price = parseFloat(row[priceCol]);
-                const qty = parseFloat(row[qtyCol]);
-
-                if (!cId || isNaN(dVal.getTime()) || !oId || isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) continue;
-
-                cleanRows.push({ CustomerID: cId, OrderDate: dVal, OrderID: oId, SalesAmount: price * qty });
-            }
-
-            if (cleanRows.length === 0) {
-                showAlert("❌ No valid records remained after cleaning.");
-                return;
-            }
-
-            let maxTime = 0;
-            cleanRows.forEach(r => { if (r.OrderDate.getTime() > maxTime) maxTime = r.OrderDate.getTime(); });
-            const refDate = maxTime + 86400000;
-
-            const customerMap = {};
-            cleanRows.forEach(r => {
-                if (!customerMap[r.CustomerID]) customerMap[r.CustomerID] = { CustomerID: r.CustomerID, maxDate: r.OrderDate.getTime(), orders: new Set(), sales: 0 };
-                const c = customerMap[r.CustomerID];
-                if (r.OrderDate.getTime() > c.maxDate) c.maxDate = r.OrderDate.getTime();
-                c.orders.add(r.OrderID);
-                c.sales += r.SalesAmount;
-            });
-
-            rfmBaseList = Object.values(customerMap).map(c => ({
-                CustomerID: c.CustomerID,
-                Recency: Math.round((refDate - c.maxDate) / 86400000),
-                Frequency: c.orders.size,
-                Monetary: c.sales
-            }));
-
-            // Scale Features
-            const featureMatrix = rfmBaseList.map(r => [
-                Math.log1p(r.Recency),
-                Math.log1p(r.Frequency),
-                Math.log1p(r.Monetary)
-            ]);
-
-            const means = [0, 0, 0];
-            const stds = [0, 0, 0];
-            const n = featureMatrix.length;
-
-            for (let i = 0; i < 3; i++) {
-                means[i] = featureMatrix.reduce((sum, row) => sum + row[i], 0) / n;
-                const variance = featureMatrix.reduce((sum, row) => sum + Math.pow(row[i] - means[i], 2), 0) / n;
-                stds[i] = Math.sqrt(variance) || 1e-8;
-            }
-
-            scaledFeatureMatrix = featureMatrix.map(row => row.map((val, j) => (val - means[j]) / stds[j]));
-
-            // Multi-Metric Diagnostics (K = 1 to 8)
-            const elbowData = [];
-            const silhouetteData = [];
-
-            for (let k = 1; k <= 8; k++) {
-                const res = runKMeansRobust(scaledFeatureMatrix, k, 15);
-                elbowData.push({ k, wcss: res.wcss });
-                if (k >= 2) {
-                    const silScore = calculateSilhouetteScore(scaledFeatureMatrix, res.assignments);
-                    silhouetteData.push({ k, score: silScore });
-                }
-            }
-
-            // SMART SELECTION LOGIC (Constrained K >= 3 for business utility)
-            let recommendedK = 3;
-            let bestBusinessSil = -1;
-
-            silhouetteData.forEach(d => {
-                if (d.k >= 3 && d.score > bestBusinessSil) {
-                    bestBusinessSil = d.score;
-                    recommendedK = d.k;
-                }
-            });
-
-            // UI Recommendation Text
-            document.getElementById('recommendationBanner').innerHTML = `
-    <strong>💡 Smart Recommendation:</strong> Recommended <strong>K = ${recommendedK}</strong> (Silhouette Quality: <strong>${bestBusinessSil.toFixed(3)}</strong>).<br>
-    <span class="text-xs font-normal text-blue-800">
-        * Note: While K=2 produces a higher raw boundary score (${silhouetteData.find(d => d.k === 2).score.toFixed(3)}),
-        <strong>K=${recommendedK}</strong> is recommended because it provides multi-tier actionable marketing groups without over-segmentation.
-    </span>
-`;
-            sliderK.value = recommendedK;
-            kValDisplay.textContent = recommendedK;
-
-            Plotly.newPlot('plotElbow', [{
-                x: elbowData.map(d => d.k),
-                y: elbowData.map(d => d.wcss),
-                type: 'scatter', mode: 'lines+markers',
-                marker: { color: '#2563eb', size: 8 }
-            }], { xaxis: { title: 'Number of Clusters (K)' }, yaxis: { title: 'WCSS' }, margin: { t: 10, b: 40, l: 50, r: 10 } }, { responsive: true });
-
-            Plotly.newPlot('plotSilhouette', [{
-                x: silhouetteData.map(d => d.k),
-                y: silhouetteData.map(d => d.score),
-                type: 'bar', marker: { color: '#60a5fa' }
-            }], { xaxis: { title: 'Number of Clusters (K)' }, yaxis: { title: 'Silhouette Score' }, margin: { t: 10, b: 40, l: 50, r: 10 } }, { responsive: true });
-
-            secDiagnostics.classList.remove('hidden');
-            secDiagnostics.classList.add('flex');
-
-            fitSelectedClusterModel();
+        for (let c = 0; c < k; c++) {
+            if (counts[c] > 0) for (let j = 0; j < nf; j++) next[c][j] /= counts[c];
+            else next[c] = [...X[Math.floor(Math.random() * n)]];
         }
+        centroids = next;
+    }
+    return { centroids, assignments, wcss };
+}
 
-        function fitSelectedClusterModel() {
-            const kSelected = parseInt(sliderK.value);
-            const finalKMeans = runKMeansRobust(scaledFeatureMatrix, kSelected, 20);
-
-            const rfmResult = rfmBaseList.map((r, idx) => ({ ...r, Cluster: finalKMeans.assignments[idx] }));
-
-            // Rank Clusters
-            const clusterMonetarySums = Array(kSelected).fill(0);
-            const clusterCounts = Array(kSelected).fill(0);
-
-            rfmResult.forEach(r => {
-                clusterMonetarySums[r.Cluster] += r.Monetary;
-                clusterCounts[r.Cluster]++;
-            });
-
-            const clusterMeans = clusterMonetarySums.map((sum, cIdx) => ({
-                cluster: cIdx,
-                avgMonetary: sum / (clusterCounts[cIdx] || 1)
-            })).sort((a, b) => a.avgMonetary - b.avgMonetary);
-
-            let personaLabels = [];
-            if (kSelected === 4) {
-                personaLabels = ["Lost / Lapsed", "Hibernating / Slipping", "Warm Leads", "Champions / High-Value"];
-            } else if (kSelected === 3) {
-                personaLabels = ["Low-Value / Inactive", "Mid-Tier / Warm Leads", "Champions / High-Value"];
-            } else if (kSelected === 2) {
-                personaLabels = ["Low-Value Accounts", "High-Value Accounts"];
-            } else {
-                personaLabels = Array.from({ length: kSelected }, (_, i) => `Tier ${i + 1} (Spend Rank)`);
-            }
-
-            const personaMap = {};
-            clusterMeans.forEach((item, rank) => { personaMap[item.cluster] = personaLabels[rank]; });
-            rfmResult.forEach(r => r.Segment = personaMap[r.Cluster]);
-
-            finalProcessedResults = rfmResult;
-            renderResultsView(rfmResult);
+// Silhouette on a random sample (max 800 points) so large files don't freeze the browser
+function calculateSilhouetteScore(Xfull, assignFull) {
+    let X = Xfull, assignments = assignFull;
+    if (Xfull.length > 800) {
+        const ids = Xfull.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, 800);
+        X = ids.map(i => Xfull[i]);
+        assignments = ids.map(i => assignFull[i]);
+    }
+    const n = X.length;
+    if (n < 2) return 0;
+    let total = 0;
+    for (let i = 0; i < n; i++) {
+        let a = 0, ownCount = 0;
+        const other = {};
+        for (let j = 0; j < n; j++) {
+            if (i === j) continue;
+            let d = 0;
+            for (let f = 0; f < 3; f++) d += (X[i][f] - X[j][f]) ** 2;
+            d = Math.sqrt(d);
+            if (assignments[j] === assignments[i]) { a += d; ownCount++; }
+            else { const o = other[assignments[j]] || (other[assignments[j]] = { s: 0, c: 0 }); o.s += d; o.c++; }
         }
+        if (ownCount === 0) continue;               // singleton cluster -> silhouette 0
+        a /= ownCount;
+        let b = Infinity;
+        Object.values(other).forEach(o => { b = Math.min(b, o.s / o.c); });
+        if (b === Infinity) continue;
+        total += (b - a) / Math.max(a, b || 1e-9);
+    }
+    return total / n;
+}
 
-        // ROBUST K-MEANS WITH MULTIPLE INITIALIZATIONS
-        function runKMeansRobust(X, k, nInit = 15) {
-            let bestModel = null;
-            let minWCSS = Infinity;
+function strategyFor(base) {
+    const S = {
+        'Champions': ['VIP early access to new products', 'Referral and review rewards', 'Personal thank-you messages'],
+        'Loyal Customers': ['Loyalty points or bundle offers', 'Ask for reviews and referrals', 'Upsell premium items'],
+        'At Risk (Former Big Spenders)': ['Personal "we miss you" outreach', 'Exclusive comeback offer', 'Short feedback survey'],
+        'New / Promising': ['Welcome series and onboarding emails', 'Second-purchase discount', 'Cross-sell related products'],
+        'Needs Attention': ['Limited-time offers', 'Product recommendations from past orders', 'Frequency incentives'],
+        'Hibernating': ['Reactivation promo', 'Seasonal reminders', 'Win-back email sequence'],
+        'Lost / Lapsed': ['Low-cost final win-back campaign', 'Feedback survey on why they left', 'Remove from paid campaigns if no response']
+    };
+    return `<ul class="text-xs space-y-1 text-gray-600 list-disc list-inside">${(S[base] || S['Needs Attention']).map(t => `<li>${t}</li>`).join('')}</ul>`;
+}
 
-            for (let init = 0; init < nInit; init++) {
-                const model = runKMeansSingle(X, k);
-                if (model.wcss < minWCSS) {
-                    minWCSS = model.wcss;
-                    bestModel = model;
-                }
-            }
-            return bestModel;
-        }
+function renderResultsView(rfmList, segs) {
+    const total = rfmList.length;
+    const avg = (key) => rfmList.reduce((a, r) => a + r[key], 0) / total;
+    $('metricTotalCust').textContent = total.toLocaleString();
+    $('metricAvgRecency').textContent = avg('Recency').toFixed(1);
+    $('metricAvgFreq').textContent = avg('Frequency').toFixed(1);
+    $('metricAvgSpend').textContent = `$${avg('Monetary').toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
-        function runKMeansSingle(X, k, maxIter = 100) {
-            const numSamples = X.length;
-            const numFeatures = X[0].length;
+    Plotly.newPlot('plotPie', [{
+        labels: segs.map(s => s.name), values: segs.map(s => s.n),
+        type: 'pie', hole: 0.4, marker: { colors: segs.map(s => s.color) }
+    }], { margin: { t: 10, b: 10, l: 10, r: 10 } }, { responsive: true });
 
-            let centroids = [];
-            for (let i = 0; i < k; i++) centroids.push([...X[Math.floor(Math.random() * numSamples)]]);
+    const traces = segs.map(s => {
+        const sub = rfmList.filter(r => r.Segment === s.name);
+        return {
+            x: sub.map(r => r.Frequency), y: sub.map(r => r.Monetary),
+            text: sub.map(r => `Customer: ${r.CustomerID}<br>Recency: ${r.Recency} days<br>RFM: ${r.R}-${r.F}-${r.M}`),
+            mode: 'markers', name: s.name,
+            marker: { color: s.color, size: sub.map(r => 6 + r.R * 2) }   // bigger dot = more recent
+        };
+    });
+    Plotly.newPlot('plotScatter', traces, {
+        xaxis: { title: 'Frequency (Orders)', type: 'log' },
+        yaxis: { title: 'Monetary ($)', type: 'log' },
+        margin: { t: 10, b: 40, l: 50, r: 10 }
+    }, { responsive: true });
 
-            let assignments = new Array(numSamples).fill(0);
-            let wcss = 0;
+    // Segment profile table (created once, placed above the action plans)
+    const stratContainer = $('smeStrategyContainer');
+    let profileCard = $('profileCard');
+    if (!profileCard) {
+        profileCard = document.createElement('div');
+        profileCard.id = 'profileCard';
+        profileCard.className = 'bg-white p-5 rounded-xl border shadow-sm';
+        const plansCard = stratContainer.parentElement;
+        plansCard.parentElement.insertBefore(profileCard, plansCard);
+    }
+    profileCard.innerHTML = `
+        <h4 class="text-md font-bold text-gray-800 mb-1">Segment Profiles (RFM Scores 1–5)</h4>
+        <p class="text-xs text-gray-500 mb-3">Scores are quintiles: 5 = best. Recency is inverted, so a high R score means a recent purchase.</p>
+        <div class="overflow-x-auto"><table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-gray-100 border-b"><tr>
+                <th class="p-2.5">Segment</th><th class="p-2.5">Customers</th><th class="p-2.5">Avg R</th><th class="p-2.5">Avg F</th><th class="p-2.5">Avg M</th>
+                <th class="p-2.5">Avg Recency (days)</th><th class="p-2.5">Avg Orders</th><th class="p-2.5">Avg Spend ($)</th>
+            </tr></thead>
+            <tbody class="divide-y">${segs.map(s => `
+                <tr><td class="p-2.5 font-semibold"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${s.color};margin-right:6px"></span>${esc(s.name)}</td>
+                <td class="p-2.5">${s.n} (${(s.n / total * 100).toFixed(0)}%)</td>
+                <td class="p-2.5">${s.R.toFixed(1)}</td><td class="p-2.5">${s.F.toFixed(1)}</td><td class="p-2.5">${s.M.toFixed(1)}</td>
+                <td class="p-2.5">${s.rec.toFixed(0)}</td><td class="p-2.5">${s.freq.toFixed(1)}</td><td class="p-2.5">$${s.mon.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td></tr>`).join('')}
+            </tbody></table></div>`;
 
-            for (let iter = 0; iter < maxIter; iter++) {
-                let changed = false;
-                wcss = 0;
+    stratContainer.innerHTML = '';
+    segs.forEach(s => {
+        const card = document.createElement('div');
+        card.className = 'border rounded-xl p-3.5 bg-slate-50 border-slate-200';
+        card.style.borderLeft = `4px solid ${s.color}`;
+        card.innerHTML = `<h5 class="text-xs font-bold text-slate-800 mb-1">${esc(s.name)}</h5>${strategyFor(s.base)}`;
+        stratContainer.appendChild(card);
+    });
 
-                for (let i = 0; i < numSamples; i++) {
-                    let minDist = Infinity;
-                    let bestCluster = 0;
+    const order = Object.fromEntries(segs.map((s, i) => [s.name, i]));
+    const sorted = [...rfmList].sort((a, b) => order[a.Segment] - order[b.Segment] || b.RFMScore - a.RFMScore);
+    const tbody = $('tableBody');
+    tbody.innerHTML = '';
+    sorted.slice(0, 100).forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="p-2.5 font-medium text-gray-800">${esc(r.CustomerID)}</td>
+            <td class="p-2.5"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200">${esc(r.Segment)}</span></td>
+            <td class="p-2.5">${r.Recency}</td><td class="p-2.5">${r.Frequency}</td>
+            <td class="p-2.5 font-medium">$${r.Monetary.toFixed(2)}</td>`;
+        tbody.appendChild(tr);
+    });
 
-                    for (let c = 0; c < k; c++) {
-                        let dist = 0;
-                        for (let j = 0; j < numFeatures; j++) dist += Math.pow(X[i][j] - centroids[c][j], 2);
-                        if (dist < minDist) { minDist = dist; bestCluster = c; }
-                    }
+    secResults.classList.remove('hidden');
+    secResults.classList.add('flex');
+}
 
-                    wcss += minDist;
-                    if (assignments[i] !== bestCluster) { assignments[i] = bestCluster; changed = true; }
-                }
-
-                if (!changed && iter > 0) break;
-
-                const newCentroids = Array.from({ length: k }, () => new Array(numFeatures).fill(0));
-                const counts = new Array(k).fill(0);
-
-                for (let i = 0; i < numSamples; i++) {
-                    const c = assignments[i];
-                    counts[c]++;
-                    for (let j = 0; j < numFeatures; j++) newCentroids[c][j] += X[i][j];
-                }
-
-                for (let c = 0; c < k; c++) {
-                    if (counts[c] > 0) {
-                        for (let j = 0; j < numFeatures; j++) newCentroids[c][j] /= counts[c];
-                    } else {
-                        newCentroids[c] = [...X[Math.floor(Math.random() * numSamples)]];
-                    }
-                }
-                centroids = newCentroids;
-            }
-
-            return { centroids, assignments, wcss };
-        }
-
-        function calculateSilhouetteScore(X, assignments) {
-            const n = X.length;
-            if (n < 2) return 0;
-            let totalSil = 0;
-
-            for (let i = 0; i < n; i++) {
-                const ownCluster = assignments[i];
-                let a = 0, ownCount = 0;
-                const otherClusterDists = {};
-
-                for (let j = 0; j < n; j++) {
-                    let d = 0;
-                    for (let f = 0; f < 3; f++) d += Math.pow(X[i][f] - X[j][f], 2);
-                    d = Math.sqrt(d);
-
-                    if (assignments[j] === ownCluster) {
-                        a += d; ownCount++;
-                    } else {
-                        const otherC = assignments[j];
-                        if (!otherClusterDists[otherC]) otherClusterDists[otherC] = { sum: 0, count: 0 };
-                        otherClusterDists[otherC].sum += d;
-                        otherClusterDists[otherC].count++;
-                    }
-                }
-
-                a = ownCount > 1 ? a / (ownCount - 1) : 0;
-                let b = Infinity;
-                Object.keys(otherClusterDists).forEach(cKey => {
-                    const avgD = otherClusterDists[cKey].sum / otherClusterDists[cKey].count;
-                    if (avgD < b) b = avgD;
-                });
-                if (b === Infinity) b = 0;
-
-                const maxAB = Math.max(a, b);
-                totalSil += maxAB > 0 ? (b - a) / maxAB : 0;
-            }
-            return totalSil / n;
-        }
-
-        function renderResultsView(rfmList) {
-            const totalCust = rfmList.length;
-            const avgRec = (rfmList.reduce((acc, r) => acc + r.Recency, 0) / totalCust).toFixed(1);
-            const avgFreq = (rfmList.reduce((acc, r) => acc + r.Frequency, 0) / totalCust).toFixed(1);
-            const avgSpend = (rfmList.reduce((acc, r) => acc + r.Monetary, 0) / totalCust).toFixed(2);
-
-            document.getElementById('metricTotalCust').textContent = totalCust.toLocaleString();
-            document.getElementById('metricAvgRecency').textContent = avgRec;
-            document.getElementById('metricAvgFreq').textContent = avgFreq;
-            document.getElementById('metricAvgSpend').textContent = `$${parseFloat(avgSpend).toLocaleString()}`;
-
-            const segmentCounts = {};
-            rfmList.forEach(r => segmentCounts[r.Segment] = (segmentCounts[r.Segment] || 0) + 1);
-
-            Plotly.newPlot('plotPie', [{
-                labels: Object.keys(segmentCounts),
-                values: Object.values(segmentCounts),
-                type: 'pie', hole: 0.4,
-                marker: { colors: ['#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854','#ffd92f'] }
-            }], { margin: { t: 10, b: 10, l: 10, r: 10 } }, { responsive: true });
-
-            const segments = Array.from(new Set(rfmList.map(r => r.Segment)));
-            const scatterTraces = segments.map(seg => {
-                const sub = rfmList.filter(r => r.Segment === seg);
-                return {
-                    x: sub.map(r => r.Frequency),
-                    y: sub.map(r => r.Monetary),
-                    text: sub.map(r => `Customer: ${r.CustomerID}<br>Recency: ${r.Recency} days`),
-                    mode: 'markers', name: seg,
-                    marker: { size: sub.map(r => Math.max(6, 20 - r.Recency / 20)) }
-                };
-            });
-
-            Plotly.newPlot('plotScatter', scatterTraces, {
-                xaxis: { title: 'Frequency (Orders)', type: 'log' },
-                yaxis: { title: 'Monetary ($)', type: 'log' },
-                margin: { t: 10, b: 40, l: 50, r: 10 }
-            }, { responsive: true });
-
-            const stratContainer = document.getElementById('smeStrategyContainer');
-            stratContainer.innerHTML = '';
-
-            segments.forEach(segName => {
-                let strategyHTML = "";
-                if (segName.includes("Champions") || segName.includes("High-Value")) {
-                    strategyHTML = `<ul class="text-xs space-y-1 text-gray-600 list-disc list-inside"><li>VIP early product access.</li><li>Referral rewards.</li></ul>`;
-                } else if (segName.includes("Warm") || segName.includes("Mid-Tier")) {
-                    strategyHTML = `<ul class="text-xs space-y-1 text-gray-600 list-disc list-inside"><li>Cross-sell sequences.</li><li>Frequency incentives.</li></ul>`;
-                } else {
-                    strategyHTML = `<ul class="text-xs space-y-1 text-gray-600 list-disc list-inside"><li>Reactivation promos.</li><li>Feedback surveys.</li></ul>`;
-                }
-
-                const card = document.createElement('div');
-                card.className = "border rounded-xl p-3.5 bg-slate-50 border-slate-200";
-                card.innerHTML = `<h5 class="text-xs font-bold text-slate-800 mb-1">${segName}</h5>${strategyHTML}`;
-                stratContainer.appendChild(card);
-            });
-
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-            rfmList.slice(0, 100).forEach(r => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="p-2.5 font-medium text-gray-800">${r.CustomerID}</td>
-                    <td class="p-2.5"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200">${r.Segment}</span></td>
-                    <td class="p-2.5">${r.Recency}</td>
-                    <td class="p-2.5">${r.Frequency}</td>
-                    <td class="p-2.5 font-medium">$${r.Monetary.toFixed(2)}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            secResults.classList.remove('hidden');
-            secResults.classList.add('flex');
-        }
-
-        function downloadCSV() {
-            if (!finalProcessedResults) return;
-            const headers = ["CustomerID", "Customer Segment", "Recency", "Frequency", "Monetary"];
-            const csvRows = [headers.join(",")];
-
-            finalProcessedResults.forEach(r => {
-                csvRows.push([`"${r.CustomerID}"`, `"${r.Segment}"`, r.Recency, r.Frequency, r.Monetary.toFixed(2)].join(","));
-            });
-
-            const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.setAttribute("href", url);
-            a.setAttribute("download", "reliable_rfm_segmented_customers.csv");
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
+function downloadCSV() {
+    if (!finalProcessedResults) return;
+    const rows = [["CustomerID", "Customer Segment", "Recency", "Frequency", "Monetary", "R Score", "F Score", "M Score", "RFM Score"].join(",")];
+    finalProcessedResults.forEach(r => rows.push([
+        `"${r.CustomerID}"`, `"${r.Segment}"`, r.Recency, r.Frequency, r.Monetary.toFixed(2), r.R, r.F, r.M, r.RFMScore
+    ].join(",")));
+    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "reliable_rfm_segmented_customers.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
     </script>
 </body>
 </html>
